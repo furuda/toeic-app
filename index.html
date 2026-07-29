@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>TOEFL英単語学習アプリ Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .perspective { perspective: 1000px; }
+    .transform-style-3d { transform-style: preserve-3d; }
+    .backface-hidden { backface-visibility: hidden; }
+    .rotate-y-180 { transform: rotateY(180deg); }
+    
+    /* スワイプアニメーション */
+    .swipe-left { animation: swipeLeft 0.25s ease forwards; }
+    .swipe-right { animation: swipeRight 0.25s ease forwards; }
+    @keyframes swipeLeft {
+      to { transform: translateX(-120%) rotate(-8deg); opacity: 0; }
+    }
+    @keyframes swipeRight {
+      to { transform: translateX(120%) rotate(8deg); opacity: 0; }
+    }
+    
+    /* 発音チェック：録音中アニメーション */
+    .recording-pulse {
+      animation: recordingPulse 1.5s ease-in-out infinite;
+    }
+    @keyframes recordingPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+    }
+    
+    button, .cursor-pointer { -webkit-tap-highlight-color: transparent; }
+    /* カスタムスクロールバー */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 antialiased flex flex-col">
+
+  <!-- ヘッダー -->
+  <header class="bg-indigo-600 text-white p-3.5 shadow-md flex justify-between items-center sticky top-0 z-20">
+    <div class="flex items-center space-x-2">
+      <h1 class="text-base md:text-lg font-bold tracking-wide flex items-center gap-1.5">
+        <span>📝</span><span>TOEFL英単語 Pro</span>
+      </h1>
+    </div>
+    <div class="flex items-center space-x-2">
+      <button onclick="toggleTtsModal()" class="text-xs bg-indigo-700 hover:bg-indigo-800 px-2.5 py-1 rounded-lg font-medium transition flex items-center space-x-1">
+        <span>🔊</span><span class="hidden sm:inline">発音設定</span>
+      </button>
+      <span id="streak-badge" class="text-xs bg-amber-500 text-white px-2 py-1 rounded-full font-bold hidden">🔥 0日連続</span>
+      <span id="progress-indicator" class="text-xs bg-indigo-800 px-2.5 py-1 rounded-full font-mono hidden">0 / 0</span>
+      <button id="pause-btn" onclick="pauseQuiz()" class="text-xs bg-rose-600 hover:bg-rose-700 px-2.5 py-1 rounded-lg hidden font-bold transition">
+        ⏸️ 中断
+      </button>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-3 py-4 max-w-md md:max-w-3xl flex-grow flex flex-col justify-start transition-all duration-300">
+
+    <!-- ローディング -->
+    <div id="loading" class="text-center py-16 my-auto">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-indigo-500 border-t-transparent mb-4"></div>
+      <p class="text-slate-600 font-semibold text-sm">スプレッドシートから単語データを読み込み中...</p>
+      <p class="text-slate-400 text-xs mt-1">（全1,915単語 ＆ 例文データベース）</p>
+    </div>
+
+    <!-- 中断データの再開確認カード -->
+    <div id="resume-card" class="bg-amber-50 border-2 border-amber-200 rounded-2xl shadow-md p-5 space-y-3 hidden mb-4">
+      <div class="flex items-center space-x-2 text-amber-800 font-bold">
+        <span class="text-xl">⏸️</span>
+        <span>中断した学習データが見つかりました</span>
+      </div>
+      <p id="resume-info" class="text-xs text-amber-700 leading-relaxed"></p>
+      <div class="grid grid-cols-2 gap-2.5 pt-1">
+        <button onclick="discardResumeData()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition">
+          破棄して新規開始
+        </button>
+        <button onclick="resumeQuiz()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-xs shadow transition">
+          続きから再開する 🚀
+        </button>
+      </div>
+    </div>
+
+    <!-- メインTOP画面 -->
+    <div id="setup-card" class="space-y-5 hidden">
+      
+      <!-- 🌟 1. 進捗状況可視化ダッシュボード -->
+      <div id="dashboard-container" class="bg-white rounded-2xl shadow-md p-5 space-y-4 border border-slate-200">
+        <div class="flex items-center justify-between border-b pb-2">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+            <span>📊</span><span>学習進捗ダッシュボード</span>
+          </h2>
+          <span id="dash-total-badge" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-bold">全 0 単語</span>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="flex justify-between text-xs font-bold">
+            <span class="text-emerald-600" id="dash-learned-rate">暗記率 0%</span>
+            <span class="text-slate-500" id="dash-learned-counts">0 / 0 単語</span>
+          </div>
+          <div class="w-full bg-slate-200 rounded-full h-3.5 flex overflow-hidden p-0.5 shadow-inner">
+            <div id="bar-learned" class="bg-emerald-500 h-full rounded-l-full transition-all duration-500" style="width: 0%" title="学習済み"></div>
+            <div id="bar-review" class="bg-amber-400 h-full transition-all duration-500" style="width: 0%" title="要復習"></div>
+            <div id="bar-unlearned" class="bg-slate-300 h-full rounded-r-full transition-all duration-500" style="width: 100%" title="未学習"></div>
+          </div>
+          <div class="flex justify-between items-center text-[11px] text-slate-500 pt-0.5 px-1">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span>学習済み: <strong id="cnt-learned" class="text-slate-700">0</strong></span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-amber-400 rounded-full inline-block"></span>要復習: <strong id="cnt-review" class="text-slate-700">0</strong></span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 bg-slate-300 rounded-full inline-block"></span>未学習: <strong id="cnt-unlearned" class="text-slate-700">0</strong></span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 pt-1 text-center">
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <div class="text-[10px] text-slate-400 font-bold">連続学習</div>
+            <div id="dash-streak" class="text-sm font-extrabold text-amber-500 mt-0.5">0 日</div>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <div class="text-[10px] text-slate-400 font-bold">通算解答数</div>
+            <div id="dash-total-answers" class="text-sm font-extrabold text-indigo-600 mt-0.5">0 回</div>
+          </div>
+          <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+            <div class="text-[10px] text-slate-400 font-bold">平均正解率</div>
+            <div id="dash-accuracy" class="text-sm font-extrabold text-emerald-600 mt-0.5">0%</div>
+          </div>
+        </div>
+
+        <details class="group border border-slate-100 rounded-xl bg-slate-50/80">
+          <summary class="flex justify-between items-center p-3 cursor-pointer text-xs font-bold text-slate-700 hover:text-indigo-600 transition">
+            <span>ステージ別の達成状況一覧 (Stage 01 〜 24)</span>
+            <span class="transform group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <div id="stage-breakdown-list" class="p-3 pt-0 space-y-2 max-h-48 overflow-y-auto text-xs border-t border-slate-200/60 mt-1">
+            <!-- JS動的生成 -->
+          </div>
+        </details>
+      </div>
+
+      <!-- 🌟 2. 弱点克服セクション -->
+      <div id="weakness-section" class="bg-white rounded-2xl shadow-md p-5 space-y-3.5 border border-slate-200">
+        <div class="flex items-center justify-between border-b pb-2">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+            <span>🔥</span><span>弱点分析（ミス頻出単語 TOP 10）</span>
+          </h2>
+          <button id="start-weak-btn" onclick="startWeaknessQuiz()" class="hidden text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-3 py-1.5 rounded-lg shadow transition active:scale-95">
+            🎯 弱点単語だけで学習スタート
+          </button>
+        </div>
+
+        <div id="weakness-chart-container" class="space-y-2.5 pt-1">
+          <!-- JS動的生成 -->
+        </div>
+      </div>
+
+      <!-- 🌟 3. 学習条件設定カード -->
+      <div class="bg-white rounded-2xl shadow-md p-5 space-y-4 border border-slate-200">
+        <div class="flex items-center justify-between border-b pb-2">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+            <span>⚙️</span><span>学習条件の設定</span>
+          </h2>
+          <span id="filtered-words-count" class="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-bold">対象: 0 単語</span>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1.5">
+            <label class="block text-xs font-bold text-slate-700">対象ステージ選択（複数選択可）</label>
+            <div class="space-x-1">
+              <button type="button" onclick="selectAllStages(true)" class="text-[11px] text-indigo-600 hover:underline font-semibold">全選択</button>
+              <span class="text-slate-300">|</span>
+              <button type="button" onclick="selectAllStages(false)" class="text-[11px] text-slate-500 hover:underline font-semibold">全解除</button>
+            </div>
+          </div>
+          <div id="stage-chips-grid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200">
+            <!-- JS動的生成 -->
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">重要性</label>
+            <select id="importance-select" onchange="updateFilteredWordCount()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+              <option value="ALL">すべて (必須 + 発展)</option>
+              <option value="必須">必須のみ</option>
+              <option value="発展">発展のみ</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">学習モード</label>
+            <select id="mode-select" onchange="toggleWeakCount(); updateFilteredWordCount();" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+              <option value="review">📅 今日要復習の単語</option>
+              <option value="unlearned">🆕 未学習の単語のみ</option>
+              <option value="weak">❌ 間違いの多い単語</option>
+              <option value="all">🎲 指定条件の全単語（ランダム）</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="weak-count-container" class="hidden bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between">
+          <label class="text-xs font-semibold text-indigo-900">指定の間違い回数：</label>
+          <div class="flex items-center space-x-1.5">
+            <input type="number" id="weak-count-input" onchange="updateFilteredWordCount()" value="2" min="1" max="99" class="w-16 bg-white border border-slate-300 rounded-lg p-1.5 text-center text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none">
+            <span class="text-xs font-bold text-indigo-700">回以上</span>
+          </div>
+        </div>
+
+        <div class="bg-indigo-50/60 rounded-xl p-3 text-[11px] text-indigo-800 space-y-1 border border-indigo-100">
+          <p class="font-bold">⌨️ ショートカットキーガイド</p>
+          <p>← / A: 要復習 ｜ → / D: 発音チェック ｜ ↑ / W: 発音 ｜ ↓ / S / Space: 裏返す</p>
+          <p>小テスト：数字キー 1〜4 で選択肢決定 / Enterで次へ進む</p>
+        </div>
+
+        <button onclick="startQuiz()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 text-sm flex items-center justify-center space-x-2">
+          <span>学習を開始する 🚀</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- 🌟 4. 発音（TTS）設定モーダル -->
+    <div id="tts-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4 border border-slate-200">
+        <div class="flex justify-between items-center border-b pb-2">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+            <span>🔊</span><span>発音（TTS）設定</span>
+          </h3>
+          <button onclick="toggleTtsModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <div class="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
+              <span>再生速度（話速）:</span>
+              <span id="tts-rate-val" class="font-bold text-indigo-600">0.9x</span>
+            </div>
+            <input type="range" id="tts-rate-slider" min="0.5" max="1.5" step="0.1" value="0.9" oninput="updateTtsSettingsPreview()" class="w-full accent-indigo-600">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">使用する音声エンジン:</label>
+            <select id="tts-voice-select" onchange="updateTtsSettingsPreview()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
+              <option value="">システム標準 (Standard English)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-xs font-semibold text-slate-700">カード表示時に自動発音:</span>
+            <input type="checkbox" id="tts-autoplay-chk" onchange="updateTtsSettingsPreview()" class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="pt-2 border-t space-y-2">
+          <button onclick="testTtsVoice()" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold py-2 rounded-xl text-xs transition border border-indigo-200 flex items-center justify-center space-x-1">
+            <span>🔊</span><span>テスト発音を聴く ("comprehension")</span>
+          </button>
+          <button onclick="saveTtsSettings()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow">
+            設定を保存して閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🎤 5. 発音チェックモーダル -->
+    <div id="pronunciation-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-5 border border-slate-200 relative">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
+            <span>🎤</span><span>発音チェック</span>
+          </h3>
+          <button onclick="closePronunciationModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+        </div>
+
+        <div class="text-center space-y-2">
+          <p class="text-xs text-slate-500 font-semibold">次の単語を発音してください</p>
+          <div id="pronunciation-target-word" class="text-3xl font-extrabold text-indigo-700 tracking-wide bg-indigo-50 py-3 rounded-xl border border-indigo-100">
+            Word
+          </div>
+        </div>
+
+        <!-- 録音ボタン -->
+        <div class="flex justify-center">
+          <button id="pronunciation-record-btn" onclick="toggleSpeechRecognition()" 
+            class="w-20 h-20 rounded-full bg-rose-500 hover:bg-rose-600 text-white shadow-lg flex items-center justify-center transition active:scale-95">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+        </div>
+        <p id="pronunciation-status" class="text-center text-xs font-bold text-slate-500">マイクをタップして録音開始</p>
+
+        <!-- 認識結果 -->
+        <div id="pronunciation-result-box" class="hidden bg-slate-50 rounded-xl p-3 border border-slate-200 space-y-2">
+          <div class="flex items-start space-x-2">
+            <span class="text-xs font-bold text-slate-500 whitespace-nowrap">認識結果:</span>
+            <span id="pronunciation-result-text" class="text-xs font-bold text-slate-800 break-all"></span>
+          </div>
+          <div id="pronunciation-judge-box" class="hidden">
+            <div id="pronunciation-judge-message" class="text-xs font-bold text-center py-2 rounded-lg"></div>
+          </div>
+        </div>
+
+        <!-- アクション -->
+        <div class="grid grid-cols-1 gap-2.5 pt-1">
+          <button id="pronunciation-retry-btn" onclick="startSpeechRecognition()" class="hidden w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition">
+            🔄 もう一度発音する
+          </button>
+          <button id="pronunciation-pass-btn" onclick="pronunciationPassed()" disabled
+            class="w-full bg-emerald-500 text-white font-bold py-3 rounded-xl text-sm shadow transition opacity-50 cursor-not-allowed">
+            ⭕️ 合格！次へ進む
+          </button>
+          <button onclick="skipPronunciationCheck()" class="w-full text-slate-400 hover:text-slate-600 font-semibold py-1 text-[11px] transition underline">
+            発音チェックをスキップ（非推奨）
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- クイズ画面（フラッシュカード） -->
+    <div id="quiz-container" class="hidden flex-grow flex flex-col justify-center space-y-4 my-auto">
+      
+      <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+        <div id="progress-bar" class="bg-indigo-500 h-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+
+      <div class="perspective w-full h-80 md:h-[420px] select-none">
+        <div id="flashcard" class="relative w-full h-full transform-style-3d transition-transform duration-500 rounded-2xl shadow-xl">
+          
+          <!-- 表面：英単語 -->
+          <div class="absolute inset-0 backface-hidden bg-white border-2 border-indigo-100 rounded-2xl p-6 flex flex-col justify-between items-center text-center">
+            <div class="flex justify-between w-full text-xs font-semibold text-slate-400">
+              <span id="card-stage" class="bg-slate-100 px-2 py-1 rounded">Stage 01</span>
+              <span id="card-importance" class="bg-indigo-50 text-indigo-600 px-2 py-1 rounded">必須</span>
+            </div>
+            
+            <div class="my-auto cursor-pointer group" onclick="speakCurrentWord(event)">
+              <div class="flex items-center justify-center space-x-2">
+                <h3 id="card-word" class="text-4xl md:text-5xl font-extrabold text-slate-800 tracking-wide">Word</h3>
+                <span class="text-2xl text-indigo-500 group-hover:scale-110 transition-transform">🔊</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-2">👆 タップで発音</p>
+            </div>
+
+            <div class="w-full flex justify-between items-center pt-2 border-t border-slate-100 text-xs text-slate-400">
+              <div class="space-x-2">
+                <span>復習: <span id="card-review-count">0</span>回</span>
+                <span>間違い: <span id="card-mistakes">0</span>回</span>
+              </div>
+              <button onclick="flipCard()" class="font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition">
+                裏面を見る 🔄
+              </button>
+            </div>
+          </div>
+
+          <!-- 裏面：詳細・例文・派生語 -->
+          <div class="absolute inset-0 backface-hidden rotate-y-180 bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 flex flex-col overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-indigo-200 pb-2 mb-3">
+              <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider">詳細・派生語</span>
+              <button onclick="flipCard()" class="text-xs font-bold text-indigo-600 bg-white px-2.5 py-1 rounded shadow-sm">
+                表面へ 🔄
+              </button>
+            </div>
+            <div id="card-derived-list" class="space-y-2.5 text-left flex-grow">
+              <!-- JS動的生成 -->
+            </div>
+            <div class="mt-3 pt-2 border-t border-indigo-200 text-xs text-indigo-600 text-center">
+              次回復習予定: <span id="card-next-review">-</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ボタンエリア：「覚えた！」を発音チェックに変更 -->
+      <div class="grid grid-cols-2 gap-4">
+        <button onclick="handleAnswer(false)" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 md:py-4 text-sm md:text-base rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-2">
+          <span>❌</span> <span>まだ（要復習）</span>
+        </button>
+        <button onclick="openPronunciationCheck()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1">
+          <span>🎤</span> <span>覚えた！（発音チェック）</span>
+        </button>
+      </div>
+
+      <p class="text-center text-xs text-slate-400">
+        ← / A: 要復習 ｜ → / D: 発音チェック ｜ ↑ / W: 発音 ｜ ↓ / S: 裏返す
+      </p>
+    </div>
+
+    <!-- 小テスト画面 -->
+    <div id="test-container" class="hidden flex-grow flex flex-col justify-center space-y-4 my-auto">
+      <div class="flex justify-between items-center border-b pb-2">
+        <span class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">✍️ 確認小テスト</span>
+        <span id="test-progress" class="text-xs font-bold text-indigo-600">0 / 0</span>
+      </div>
+
+      <div class="bg-white rounded-2xl p-5 shadow-md border-2 border-indigo-100 space-y-3">
+        <div class="flex items-center justify-between border-b pb-2">
+          <div class="flex items-center space-x-2">
+            <span id="test-word-label" class="text-xs font-extrabold bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-md">Word</span>
+            <button onclick="speakTestWord()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2.5 py-1 rounded-lg font-medium transition flex items-center space-x-1 border border-indigo-200">
+              <span>🔊</span><span>単語を聞く</span>
+            </button>
+          </div>
+          <button onclick="speakTestExample()" class="text-xs bg-slate-50 hover:bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-medium transition flex items-center space-x-1 border border-slate-200">
+            <span>🔊</span><span>例文を聞く</span>
+          </button>
+        </div>
+
+        <div class="cursor-pointer group" onclick="speakTestExample()">
+          <p id="test-example" class="text-sm font-semibold text-slate-800 leading-relaxed"></p>
+        </div>
+
+        <div class="pt-1">
+          <button id="toggle-translation-btn" onclick="toggleTestTranslation()" class="w-full py-1.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-semibold transition flex items-center justify-center space-x-1">
+            <span>💡 日本語訳を表示する</span>
+          </button>
+
+          <div id="test-translation-box" class="hidden mt-2 bg-indigo-50/70 p-3 rounded-xl border border-indigo-100 space-y-1.5 text-xs">
+            <div class="flex items-start space-x-1.5">
+              <span class="font-bold text-indigo-700 whitespace-nowrap">💡 単語の意味:</span>
+              <span id="test-meaning-ja" class="text-slate-800 font-semibold"></span>
+            </div>
+            <div id="test-example-ja-container" class="flex items-start space-x-1.5 pt-1.5 border-t border-indigo-100">
+              <span class="font-bold text-indigo-700 whitespace-nowrap">💬 例文の訳:</span>
+              <span id="test-example-ja" class="text-slate-600 font-medium"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="test-choices" class="space-y-2.5">
+        <!-- JS動的生成 -->
+      </div>
+
+      <div id="test-next-container" class="hidden pt-2">
+        <button id="test-next-btn" onclick="nextTestQuestion()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-2">
+          <span>次の問題へ進む ➔</span>
+          <span class="text-xs bg-indigo-700 px-2 py-0.5 rounded text-indigo-100">(Enter / Space)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 結果画面 -->
+    <div id="result-card" class="bg-white rounded-2xl shadow-lg p-6 text-center space-y-4 hidden my-auto">
+      <div class="text-5xl">🎉</div>
+      <h2 class="text-2xl font-bold text-slate-800">お疲れ様でした！</h2>
+      
+      <div class="grid grid-cols-2 gap-3 my-4">
+        <div class="bg-emerald-50 rounded-lg p-3">
+          <div id="result-rate" class="text-2xl font-bold text-emerald-600">0%</div>
+          <div class="text-xs text-emerald-700">単語暗記率</div>
+        </div>
+        <div class="bg-indigo-50 rounded-lg p-3">
+          <div id="test-result-rate" class="text-2xl font-bold text-indigo-600">-</div>
+          <div class="text-xs text-indigo-700">小テスト正解率</div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl">
+        <div>覚えた: <span id="result-correct" class="font-bold text-emerald-600">0</span></div>
+        <div>要復習: <span id="result-wrong" class="font-bold text-rose-600">0</span></div>
+      </div>
+
+      <p id="result-summary" class="text-slate-600 text-xs leading-relaxed"></p>
+      
+      <div class="space-y-3 pt-2">
+        <button id="save-btn" onclick="saveAndReset()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95">
+          💾 データを保存してTOPへ戻る
+        </button>
+        <button onclick="if(confirm('保存せずに終了しますか？')) resetToSetup()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl transition text-xs">
+          保存せずに戻る
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="text-center py-3 text-xs text-slate-400">
+    TOEFL English Learning App Pro
+  </footer>
+
+  <script>
+    // 🔗 ここにご自身の GAS ウェブアプリ URL を設定してください
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw5FOs9uHoC6uqeMezLVlXGkMnBpWPSXsOQZMUG53t89w6-EiKTue285-BqToXKpAhqPg/exec";
+
+    const INTERVALS = [1, 3, 7, 14, 30, 60, 90];
+    const STORAGE_KEY = 'vocab_app_paused_session_v2';
+    const TTS_STORAGE_KEY = 'vocab_app_tts_settings_v2';
+
+    // アプリ状態
+    const App = {
+      allWords: [],
+      queue: [],
+      index: 0,
+      roundBoundaryIndex: 0,
+      isFlipped: false,
+      results: [],
+      testQueue: [],
+      testIndex: 0,
+      testResults: [],
+      allMeaningEnList: [],
+      isTesting: false,
+      sessionId: 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      stats: { correct: 0, wrong: 0, testCorrect: 0, testWrong: 0 },
+      selectedStages: new Set(),
+      tts: { rate: 0.9, voiceURI: '', autoPlay: false },
+      recognition: null,
+      isRecording: false,
+      pronunciationTarget: '',
+      lastRecognizedText: ''
+    };
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function getTodayDateString() {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function showToast(msg, type = 'info') {
+      const el = document.createElement('div');
+      const bg = type === 'error' ? 'bg-rose-600' : type === 'success' ? 'bg-emerald-600' : 'bg-slate-800';
+      el.className = `fixed bottom-5 left-1/2 -translate-x-1/2 ${bg} text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-lg z-50 transition-all duration-300 opacity-0`;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.classList.remove('opacity-0'), 10);
+      setTimeout(() => {
+        el.classList.add('opacity-0');
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    // ============================================
+    // 🎤 発音チェック機能（GitHub Pagesで完全稼働）
+    // ============================================
+    function createSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showToast('⚠️ お使いのブラウザは音声認識に対応していません。Chrome/Edgeをご利用ください。', 'error');
+        return null;
+      }
+      
+      const rec = new SpeechRecognition();
+      rec.lang = 'en-US';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.maxAlternatives = 3;
+      
+      rec.onstart = function() {
+        App.isRecording = true;
+        App.lastRecognizedText = '';
+        updatePronunciationUI('recording');
+      };
+      
+      rec.onresult = function(event) {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        const displayText = finalTranscript || interimTranscript;
+        if (displayText) {
+          App.lastRecognizedText = displayText;
+          document.getElementById('pronunciation-result-text').textContent = displayText;
+          document.getElementById('pronunciation-result-box').classList.remove('hidden');
+        }
+      };
+      
+      rec.onerror = function(event) {
+        App.isRecording = false;
+        updatePronunciationUI('idle');
+        
+        let msg = '音声認識エラーが発生しました';
+        if (event.error === 'no-speech') msg = '音声が検出されませんでした。もう一度お試しください。';
+        else if (event.error === 'audio-capture') msg = 'マイクが見つかりません。';
+        else if (event.error === 'not-allowed') msg = 'マイクの使用が拒否されました。ブラウザの鍵マークからマイクを許可してください。';
+        
+        document.getElementById('pronunciation-status').textContent = msg;
+        document.getElementById('pronunciation-status').className = 'text-center text-xs font-bold text-rose-500';
+      };
+      
+      rec.onend = function() {
+        App.isRecording = false;
+        updatePronunciationUI('idle');
+        if (App.lastRecognizedText) {
+          checkPronunciationResult(App.lastRecognizedText);
+        }
+      };
+      
+      return rec;
+    }
+
+    function openPronunciationCheck() {
+      const item = App.queue[App.index];
+      if (!item || !item.word) return;
+      
+      App.pronunciationTarget = item.word;
+      App.lastRecognizedText = '';
+      
+      document.getElementById('pronunciation-target-word').textContent = item.word;
+      document.getElementById('pronunciation-result-box').classList.add('hidden');
+      document.getElementById('pronunciation-judge-box').classList.add('hidden');
+      document.getElementById('pronunciation-retry-btn').classList.add('hidden');
+      
+      const passBtn = document.getElementById('pronunciation-pass-btn');
+      passBtn.disabled = true;
+      passBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      passBtn.classList.remove('hover:bg-emerald-600');
+      
+      document.getElementById('pronunciation-status').textContent = 'マイクをタップして録音開始';
+      document.getElementById('pronunciation-status').className = 'text-center text-xs font-bold text-slate-500';
+      
+      document.getElementById('pronunciation-modal').classList.remove('hidden');
+    }
+
+    function closePronunciationModal() {
+      if (App.recognition && App.isRecording) {
+        try { App.recognition.stop(); } catch(e){}
+      }
+      App.isRecording = false;
+      document.getElementById('pronunciation-modal').classList.add('hidden');
+    }
+
+    function toggleSpeechRecognition() {
+      if (App.isRecording) {
+        if (App.recognition) {
+          try { App.recognition.stop(); } catch(e){}
+        }
+        return;
+      }
+      
+      document.getElementById('pronunciation-result-box').classList.remove('hidden');
+      document.getElementById('pronunciation-result-text').textContent = '...';
+      document.getElementById('pronunciation-judge-box').classList.add('hidden');
+      document.getElementById('pronunciation-retry-btn').classList.add('hidden');
+      
+      const passBtn = document.getElementById('pronunciation-pass-btn');
+      passBtn.disabled = true;
+      passBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      App.recognition = createSpeechRecognition();
+      if (App.recognition) {
+        try {
+          App.recognition.start();
+        } catch (e) {
+          console.error(e);
+          App.isRecording = false;
+          updatePronunciationUI('idle');
+        }
+      }
+    }
+
+    function startSpeechRecognition() {
+      toggleSpeechRecognition();
+    }
+
+    function updatePronunciationUI(state) {
+      const btn = document.getElementById('pronunciation-record-btn');
+      const status = document.getElementById('pronunciation-status');
+      
+      if (state === 'recording') {
+        btn.classList.add('recording-pulse', 'bg-rose-600');
+        btn.classList.remove('bg-rose-500');
+        status.textContent = '🔴 録音中...（発音し終わったらもう一度タップ）';
+        status.className = 'text-center text-xs font-bold text-rose-500';
+      } else {
+        btn.classList.remove('recording-pulse', 'bg-rose-600');
+        btn.classList.add('bg-rose-500');
+        if (document.getElementById('pronunciation-judge-box').classList.contains('hidden')) {
+          status.textContent = 'マイクをタップして録音開始';
+          status.className = 'text-center text-xs font-bold text-slate-500';
+        }
+      }
+    }
+
+    function checkPronunciationResult(recognizedText) {
+      const target = App.pronunciationTarget.toLowerCase().trim();
+      const recognized = recognizedText.toLowerCase().replace(/[.,!?;:'"]/g, '').trim();
+      
+      let isCorrect = false;
+      const words = recognized.split(/\s+/);
+      
+      if (recognized === target || words.includes(target)) {
+        isCorrect = true;
+      }
+      
+      const judgeBox = document.getElementById('pronunciation-judge-box');
+      const judgeMsg = document.getElementById('pronunciation-judge-message');
+      const retryBtn = document.getElementById('pronunciation-retry-btn');
+      const passBtn = document.getElementById('pronunciation-pass-btn');
+      
+      judgeBox.classList.remove('hidden');
+      
+      if (isCorrect) {
+        judgeMsg.textContent = '✅ 完璧な発音です！';
+        judgeMsg.className = 'text-xs font-bold text-center py-2 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200';
+        
+        passBtn.disabled = false;
+        passBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        passBtn.classList.add('hover:bg-emerald-600');
+        
+        retryBtn.classList.add('hidden');
+        speakText('Perfect!');
+      } else {
+        judgeMsg.innerHTML = `❌ 「${escapeHtml(recognizedText)}」と認識されました<br><span class="text-[10px] font-normal">正しく発音してもう一度チャレンジしましょう</span>`;
+        judgeMsg.className = 'text-xs font-bold text-center py-2 rounded-lg bg-rose-100 text-rose-700 border border-rose-200';
+        
+        retryBtn.classList.remove('hidden');
+        passBtn.disabled = true;
+        passBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+    }
+
+    function pronunciationPassed() {
+      closePronunciationModal();
+      handleAnswer(true);
+    }
+
+    function skipPronunciationCheck() {
+      if (confirm('発音チェックをスキップしますか？')) {
+        closePronunciationModal();
+        handleAnswer(true);
+      }
+    }
+
+    // ============================================
+    // TTS 発音機能
+    // ============================================
+    function loadTtsSettings() {
+      try {
+        const saved = localStorage.getItem(TTS_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          App.tts.rate = parsed.rate || 0.9;
+          App.tts.voiceURI = parsed.voiceURI || '';
+          App.tts.autoPlay = !!parsed.autoPlay;
+        }
+      } catch (e) {}
+
+      document.getElementById('tts-rate-slider').value = App.tts.rate;
+      document.getElementById('tts-rate-val').textContent = App.tts.rate + 'x';
+      document.getElementById('tts-autoplay-chk').checked = App.tts.autoPlay;
+    }
+
+    function populateVoices() {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return;
+
+      const select = document.getElementById('tts-voice-select');
+      select.innerHTML = '<option value="">システム標準 (Standard English)</option>';
+
+      const enVoices = voices.filter(v => v.lang.startsWith('en'));
+
+      if (!App.tts.voiceURI) {
+        const defaultVoice = enVoices.find(v => v.name.includes('Google US English')) ||
+                             enVoices.find(v => v.lang === 'en-US' || v.lang === 'en_US') ||
+                             enVoices[0];
+        if (defaultVoice) {
+          App.tts.voiceURI = defaultVoice.voiceURI;
+        }
+      }
+
+      enVoices.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.voiceURI;
+        opt.textContent = `${v.name} (${v.lang})`;
+        if (v.voiceURI === App.tts.voiceURI) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    function toggleTtsModal() {
+      const modal = document.getElementById('tts-modal');
+      if (modal.classList.contains('hidden')) {
+        populateVoices();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function updateTtsSettingsPreview() {
+      const rate = parseFloat(document.getElementById('tts-rate-slider').value);
+      document.getElementById('tts-rate-val').textContent = rate + 'x';
+    }
+
+    function saveTtsSettings() {
+      App.tts.rate = parseFloat(document.getElementById('tts-rate-slider').value);
+      App.tts.voiceURI = document.getElementById('tts-voice-select').value;
+      App.tts.autoPlay = document.getElementById('tts-autoplay-chk').checked;
+
+      localStorage.setItem(TTS_STORAGE_KEY, JSON.stringify(App.tts));
+      showToast('✅ 発音設定を保存しました', 'success');
+      toggleTtsModal();
+    }
+
+    function speakText(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      window.speechSynthesis.cancel();
+
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = App.tts.rate || 0.9;
+
+      let voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) {
+        populateVoices();
+        voices = window.speechSynthesis.getVoices();
+      }
+
+      let targetVoice = null;
+      if (App.tts.voiceURI) {
+        targetVoice = voices.find(x => x.voiceURI === App.tts.voiceURI);
+      }
+      if (!targetVoice && voices && voices.length > 0) {
+        targetVoice = voices.find(x => x.name.includes('Google US English')) ||
+                      voices.find(x => x.lang === 'en-US' || x.lang === 'en_US') ||
+                      voices.find(x => x.lang.startsWith('en'));
+      }
+
+      if (targetVoice) {
+        u.voice = targetVoice;
+      }
+
+      window.speechSynthesis.speak(u);
+    }
+
+    function testTtsVoice() {
+      speakText('comprehension');
+    }
+
+    function speakCurrentWord(e) {
+      if (e) e.stopPropagation();
+      const item = App.queue[App.index];
+      if (item?.word) speakText(item.word);
+    }
+
+    // ============================================
+    // API 通信関数（GASとの連動）
+    // ============================================
+    async function loadDataFromGAS() {
+      try {
+        const res = await fetch(`${GAS_API_URL}?action=getInitialData`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        onDataLoaded(data);
+      } catch (err) {
+        alert('データ読み込み失敗: ' + err.message);
+      }
+    }
+
+    async function loadStatsFromGAS() {
+      try {
+        const res = await fetch(`${GAS_API_URL}?action=getStudyStats`);
+        const stats = await res.json();
+        if (stats) {
+          if (stats.streakDays > 0) {
+            const badge = document.getElementById('streak-badge');
+            badge.textContent = `🔥 ${stats.streakDays}日連続`;
+            badge.classList.remove('hidden');
+          }
+          document.getElementById('dash-streak').textContent = `${stats.streakDays || 0} 日`;
+          document.getElementById('dash-total-answers').textContent = `${stats.totalAnswers || 0} 回`;
+          document.getElementById('dash-accuracy').textContent = `${stats.accuracy || 0}%`;
+        }
+      } catch (err) {
+        console.warn('Stats load error:', err);
+      }
+    }
+
+    // 初期化
+    window.onload = function() {
+      loadTtsSettings();
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+        window.speechSynthesis.onvoiceschanged = populateVoices;
+      }
+
+      initStageChips();
+      setupKeyListeners();
+
+      loadDataFromGAS();
+      loadStatsFromGAS();
+    };
+
+    function initStageChips() {
+      const grid = document.getElementById('stage-chips-grid');
+      grid.innerHTML = '';
+      
+      for (let i = 1; i <= 24; i++) {
+        const stageName = `Stage ${String(i).padStart(2, '0')}`;
+        App.selectedStages.add(stageName);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.stage = stageName;
+        btn.className = 'stage-chip bg-indigo-600 text-white font-bold text-[11px] py-1.5 px-1 rounded-lg shadow-sm transition active:scale-95 text-center truncate border border-indigo-600';
+        btn.textContent = `St.${String(i).padStart(2, '0')}`;
+        
+        btn.onclick = () => toggleStageChip(stageName, btn);
+        grid.appendChild(btn);
+      }
+    }
+
+    function toggleStageChip(stageName, btn) {
+      if (App.selectedStages.has(stageName)) {
+        App.selectedStages.delete(stageName);
+        btn.className = 'stage-chip bg-white text-slate-600 hover:bg-slate-100 font-semibold text-[11px] py-1.5 px-1 rounded-lg border border-slate-200 transition text-center truncate';
+      } else {
+        App.selectedStages.add(stageName);
+        btn.className = 'stage-chip bg-indigo-600 text-white font-bold text-[11px] py-1.5 px-1 rounded-lg shadow-sm transition active:scale-95 text-center truncate border border-indigo-600';
+      }
+      updateFilteredWordCount();
+    }
+
+    function selectAllStages(selectAll) {
+      const buttons = document.querySelectorAll('.stage-chip');
+      buttons.forEach(btn => {
+        const stageName = btn.dataset.stage;
+        if (selectAll) {
+          App.selectedStages.add(stageName);
+          btn.className = 'stage-chip bg-indigo-600 text-white font-bold text-[11px] py-1.5 px-1 rounded-lg shadow-sm transition active:scale-95 text-center truncate border border-indigo-600';
+        } else {
+          App.selectedStages.delete(stageName);
+          btn.className = 'stage-chip bg-white text-slate-600 hover:bg-slate-100 font-semibold text-[11px] py-1.5 px-1 rounded-lg border border-slate-200 transition text-center truncate';
+        }
+      });
+      updateFilteredWordCount();
+    }
+
+    function onDataLoaded(data) {
+      App.allWords = data;
+
+      const meaningsSet = new Set();
+      data.forEach(item => {
+        if (item.details && Array.isArray(item.details)) {
+          item.details.forEach(d => {
+            if (d.meaningEn && String(d.meaningEn).trim().length > 0) {
+              meaningsSet.add(String(d.meaningEn).trim());
+            }
+          });
+        }
+      });
+      App.allMeaningEnList = Array.from(meaningsSet);
+
+      renderDashboard();
+      renderWeaknessChart();
+      updateFilteredWordCount();
+
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('setup-card').classList.remove('hidden');
+
+      checkResumeData();
+    }
+
+    function renderDashboard() {
+      const total = App.allWords.length;
+      let learned = 0, review = 0, unlearned = 0;
+
+      const stageStats = {};
+      for (let i = 1; i <= 24; i++) {
+        const sName = `Stage ${String(i).padStart(2, '0')}`;
+        stageStats[sName] = { total: 0, learned: 0 };
+      }
+
+      App.allWords.forEach(w => {
+        if (w.status === 1) learned++;
+        else if (w.status === 2) review++;
+        else unlearned++;
+
+        if (stageStats[w.stage]) {
+          stageStats[w.stage].total++;
+          if (w.status === 1) stageStats[w.stage].learned++;
+        }
+      });
+
+      const learnedPct = total > 0 ? Math.round((learned / total) * 100) : 0;
+      const reviewPct = total > 0 ? Math.round((review / total) * 100) : 0;
+      const unlearnedPct = Math.max(0, 100 - learnedPct - reviewPct);
+
+      document.getElementById('dash-total-badge').textContent = `全 ${total} 単語`;
+      document.getElementById('dash-learned-rate').textContent = `暗記率 ${learnedPct}%`;
+      document.getElementById('dash-learned-counts').textContent = `${learned} / ${total} 単語`;
+
+      document.getElementById('bar-learned').style.width = `${learnedPct}%`;
+      document.getElementById('bar-review').style.width = `${reviewPct}%`;
+      document.getElementById('bar-unlearned').style.width = `${unlearnedPct}%`;
+
+      document.getElementById('cnt-learned').textContent = learned;
+      document.getElementById('cnt-review').textContent = review;
+      document.getElementById('cnt-unlearned').textContent = unlearned;
+
+      const listEl = document.getElementById('stage-breakdown-list');
+      listEl.innerHTML = '';
+      Object.keys(stageStats).sort().forEach(sName => {
+        const st = stageStats[sName];
+        const pct = st.total > 0 ? Math.round((st.learned / st.total) * 100) : 0;
+        
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between gap-2';
+        item.innerHTML = `
+          <span class="font-bold text-slate-700 w-16">${sName}</span>
+          <div class="flex-grow bg-slate-200 rounded-full h-2 overflow-hidden">
+            <div class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+          <span class="text-[11px] font-mono font-bold text-slate-500 w-12 text-right">${pct}%</span>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    function renderWeaknessChart() {
+      const weakWords = App.allWords
+        .filter(w => (w.mistakes || 0) > 0)
+        .sort((a, b) => b.mistakes - a.mistakes)
+        .slice(0, 10);
+
+      const container = document.getElementById('weakness-chart-container');
+      const startBtn = document.getElementById('start-weak-btn');
+      container.innerHTML = '';
+
+      if (weakWords.length === 0) {
+        container.innerHTML = `<div class="text-xs text-slate-400 text-center py-4">🎉 間違い記録のある単語はありません！素晴らしい進捗です。</div>`;
+        startBtn.classList.add('hidden');
+        return;
+      }
+
+      startBtn.classList.remove('hidden');
+      const maxMistakes = Math.max(...weakWords.map(w => w.mistakes));
+
+      weakWords.forEach(w => {
+        const pct = Math.round((w.mistakes / maxMistakes) * 100);
+        const item = document.createElement('div');
+        item.className = 'space-y-1';
+        item.innerHTML = `
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-slate-800">${escapeHtml(w.word)} <span class="text-[10px] text-slate-400 font-normal">(${w.stage})</span></span>
+            <span class="font-bold text-rose-600 text-[11px]">${w.mistakes} 回ミス</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div class="bg-rose-500 h-full rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function toggleWeakCount() {
+      const mode = document.getElementById('mode-select').value;
+      const cnt = document.getElementById('weak-count-container');
+      if (mode === 'weak') {
+        cnt.classList.remove('hidden');
+      } else {
+        cnt.classList.add('hidden');
+      }
+    }
+
+    function filterWords() {
+      const imp = document.getElementById('importance-select').value;
+      const mode = document.getElementById('mode-select').value;
+      const weakThreshold = parseInt(document.getElementById('weak-count-input').value, 10) || 1;
+      const today = getTodayDateString();
+
+      return App.allWords.filter(w => {
+        if (!App.selectedStages.has(w.stage)) return false;
+        if (imp !== 'ALL' && w.importance !== imp) return false;
+
+        if (mode === 'review') {
+          return w.status === 2 || (w.nextReviewDate && w.nextReviewDate <= today);
+        } else if (mode === 'unlearned') {
+          return w.status === 3;
+        } else if (mode === 'weak') {
+          return (w.mistakes || 0) >= weakThreshold;
+        }
+        return true;
+      });
+    }
+
+    function updateFilteredWordCount() {
+      const list = filterWords();
+      document.getElementById('filtered-words-count').textContent = `対象: ${list.length} 単語`;
+    }
+
+    function startWeaknessQuiz() {
+      document.getElementById('mode-select').value = 'weak';
+      document.getElementById('weak-count-input').value = 1;
+      toggleWeakCount();
+      updateFilteredWordCount();
+      startQuiz();
+    }
+
+    function startQuiz() {
+      const filtered = filterWords();
+      if (filtered.length === 0) {
+        alert('指定された条件に一致する単語がありません。条件を変更してください。');
+        return;
+      }
+
+      App.queue = [...filtered].sort(() => Math.random() - 0.5);
+      App.index = 0;
+      App.roundBoundaryIndex = App.queue.length;
+      App.results = [];
+      App.testQueue = [];
+      App.testIndex = 0;
+      App.testResults = [];
+      App.stats = { correct: 0, wrong: 0, testCorrect: 0, testWrong: 0 };
+      App.isTesting = false;
+
+      document.getElementById('setup-card').classList.add('hidden');
+      document.getElementById('pause-btn').classList.remove('hidden');
+      document.getElementById('progress-indicator').classList.remove('hidden');
+      document.getElementById('quiz-container').classList.remove('hidden');
+
+      showCurrentCard();
+    }
+
+    function showCurrentCard() {
+      App.isFlipped = false;
+      const card = document.getElementById('flashcard');
+      card.classList.remove('rotate-y-180', 'swipe-left', 'swipe-right');
+
+      const item = App.queue[App.index];
+      const total = App.roundBoundaryIndex;
+      const currentNum = Math.min(App.index + 1, total);
+
+      document.getElementById('progress-indicator').textContent = `${currentNum} / ${total}`;
+      document.getElementById('progress-bar').style.width = `${(currentNum / total) * 100}%`;
+
+      document.getElementById('card-stage').textContent = item.stage;
+      document.getElementById('card-importance').textContent = item.importance;
+      document.getElementById('card-word').textContent = item.word;
+      document.getElementById('card-review-count').textContent = item.reviewCount || 0;
+      document.getElementById('card-mistakes').textContent = item.mistakes || 0;
+      document.getElementById('card-next-review').textContent = item.nextReviewDate || '未設定';
+
+      const derivedContainer = document.getElementById('card-derived-list');
+      derivedContainer.innerHTML = '';
+
+      if (item.details && item.details.length > 0) {
+        item.details.forEach(d => {
+          const block = document.createElement('div');
+          block.className = 'bg-white/80 p-2.5 rounded-xl border border-indigo-100 text-xs space-y-1';
+          block.innerHTML = `
+            <div class="font-bold text-slate-800">${escapeHtml(d.meaningJa)}</div>
+            ${d.meaningEn ? `<div class="text-[11px] text-slate-500 italic">${escapeHtml(d.meaningEn)}</div>` : ''}
+            ${d.exampleEn ? `<div class="text-[11px] text-indigo-900 font-medium pt-1 border-t border-slate-100">💬 ${escapeHtml(d.exampleEn)}</div>` : ''}
+            ${d.exampleJa ? `<div class="text-[10px] text-slate-500">${escapeHtml(d.exampleJa)}</div>` : ''}
+          `;
+          derivedContainer.appendChild(block);
+        });
+      }
+
+      if (item.derived && item.derived.length > 0) {
+        const derivedBlock = document.createElement('div');
+        derivedBlock.className = 'bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1 mt-2';
+        let html = '<div class="font-bold text-amber-800 text-[11px]">🌱 派生語:</div>';
+        item.derived.forEach(dr => {
+          html += `<div class="text-[11px] text-amber-900"><strong>${escapeHtml(dr.derivedWord)}</strong>: ${escapeHtml(dr.meaning)}</div>`;
+        });
+        derivedBlock.innerHTML = html;
+        derivedContainer.appendChild(derivedBlock);
+      }
+
+      if (App.tts.autoPlay) {
+        speakText(item.word);
+      }
+    }
+
+    function flipCard() {
+      App.isFlipped = !App.isFlipped;
+      const card = document.getElementById('flashcard');
+      if (App.isFlipped) {
+        card.classList.add('rotate-y-180');
+      } else {
+        card.classList.remove('rotate-y-180');
+      }
+    }
+
+    function handleAnswer(isCorrect) {
+      const card = document.getElementById('flashcard');
+      const item = App.queue[App.index];
+
+      card.classList.add(isCorrect ? 'swipe-right' : 'swipe-left');
+
+      const today = getTodayDateString();
+
+      if (isCorrect) {
+        App.stats.correct++;
+        const nextRevCount = (item.reviewCount || 0) + 1;
+        const intervalDays = INTERVALS[Math.min(nextRevCount - 1, INTERVALS.length - 1)];
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + intervalDays);
+        const nextDateStr = nextDate.toISOString().split('T')[0];
+
+        App.results.push({
+          id: item.id,
+          word: item.word,
+          stage: item.stage,
+          previousStatus: item.status,
+          status: 1,
+          mistakes: item.mistakes || 0,
+          reviewCount: nextRevCount,
+          nextReviewDate: nextDateStr,
+          lastReviewDate: today,
+          isCorrect: true
+        });
+
+        if (!App.testQueue.some(x => x.id === item.id)) {
+          App.testQueue.push(item);
+        }
+      } else {
+        App.stats.wrong++;
+        const newMistakes = (item.mistakes || 0) + 1;
+
+        App.results.push({
+          id: item.id,
+          word: item.word,
+          stage: item.stage,
+          previousStatus: item.status,
+          status: 2,
+          mistakes: newMistakes,
+          reviewCount: item.reviewCount || 0,
+          nextReviewDate: today,
+          lastReviewDate: today,
+          isCorrect: false
+        });
+
+        App.queue.push(item);
+      }
+
+      setTimeout(() => {
+        App.index++;
+        if (App.index < App.queue.length) {
+          showCurrentCard();
+        } else {
+          startTestSession();
+        }
+      }, 250);
+    }
+
+    function startTestSession() {
+      document.getElementById('quiz-container').classList.add('hidden');
+      
+      if (App.testQueue.length === 0) {
+        showResults();
+        return;
+      }
+
+      App.isTesting = true;
+      App.testIndex = 0;
+      App.testResults = [];
+      App.testQueue.sort(() => Math.random() - 0.5);
+
+      document.getElementById('test-container').classList.remove('hidden');
+      showCurrentTestQuestion();
+    }
+
+    function showCurrentTestQuestion() {
+      const item = App.testQueue[App.testIndex];
+      const total = App.testQueue.length;
+
+      document.getElementById('test-progress').textContent = `${App.testIndex + 1} / ${total}`;
+      document.getElementById('test-word-label').textContent = item.word;
+
+      const detail = (item.details && item.details[0]) ? item.details[0] : {};
+      document.getElementById('test-example').textContent = detail.exampleEn || 'No example available.';
+      document.getElementById('test-meaning-ja').textContent = detail.meaningJa || 'ー';
+      document.getElementById('test-example-ja').textContent = detail.exampleJa || 'ー';
+
+      document.getElementById('test-translation-box').classList.add('hidden');
+      document.getElementById('toggle-translation-btn').classList.remove('hidden');
+      document.getElementById('test-next-container').classList.add('hidden');
+
+      const correctMeaning = detail.meaningEn || 'Correct meaning';
+      const dummyChoices = App.allMeaningEnList
+        .filter(m => m !== correctMeaning)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3);
+
+      const allChoices = [correctMeaning, ...dummyChoices].sort(() => Math.random() - 0.5);
+
+      const choicesContainer = document.getElementById('test-choices');
+      choicesContainer.innerHTML = '';
+
+      allChoices.forEach((choiceText, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'test-choice-btn w-full bg-white hover:bg-indigo-50/50 border-2 border-slate-200 rounded-xl p-3.5 text-left text-xs font-semibold text-slate-800 transition flex items-center space-x-2';
+        btn.onclick = () => selectTestChoice(btn, choiceText === correctMeaning, correctMeaning);
+        btn.innerHTML = `
+          <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-xs shrink-0">${idx + 1}</span>
+          <span class="flex-grow">${escapeHtml(choiceText)}</span>
+        `;
+        choicesContainer.appendChild(btn);
+      });
+
+      if (App.tts.autoPlay) {
+        speakText(item.word);
+      }
+    }
+
+    function selectTestChoice(selectedBtn, isCorrect, correctMeaningText) {
+      const choiceBtns = document.querySelectorAll('.test-choice-btn');
+      choiceBtns.forEach(btn => btn.disabled = true);
+
+      const item = App.testQueue[App.testIndex];
+
+      if (isCorrect) {
+        selectedBtn.classList.remove('border-slate-200', 'hover:bg-indigo-50/50');
+        selectedBtn.classList.add('border-emerald-500', 'bg-emerald-50', 'text-emerald-900');
+        App.stats.testCorrect++;
+      } else {
+        selectedBtn.classList.remove('border-slate-200', 'hover:bg-indigo-50/50');
+        selectedBtn.classList.add('border-rose-500', 'bg-rose-50', 'text-rose-900');
+        App.stats.testWrong++;
+
+        choiceBtns.forEach(btn => {
+          if (btn.textContent.includes(correctMeaningText)) {
+            btn.classList.remove('border-slate-200');
+            btn.classList.add('border-emerald-500', 'bg-emerald-50');
+          }
+        });
+      }
+
+      App.testResults.push({
+        id: item.id,
+        word: item.word,
+        stage: item.stage,
+        isCorrect: isCorrect,
+        status: isCorrect ? 1 : 2
+      });
+
+      document.getElementById('test-translation-box').classList.remove('hidden');
+      document.getElementById('toggle-translation-btn').classList.add('hidden');
+      document.getElementById('test-next-container').classList.remove('hidden');
+    }
+
+    function toggleTestTranslation() {
+      const box = document.getElementById('test-translation-box');
+      box.classList.toggle('hidden');
+    }
+
+    function speakTestWord() {
+      const item = App.testQueue[App.testIndex];
+      if (item?.word) speakText(item.word);
+    }
+
+    function speakTestExample() {
+      const item = App.testQueue[App.testIndex];
+      const detail = (item.details && item.details[0]) ? item.details[0] : {};
+      if (detail.exampleEn) speakText(detail.exampleEn);
+    }
+
+    function nextTestQuestion() {
+      App.testIndex++;
+      if (App.testIndex < App.testQueue.length) {
+        showCurrentTestQuestion();
+      } else {
+        showResults();
+      }
+    }
+
+    function showResults() {
+      document.getElementById('test-container').classList.add('hidden');
+      document.getElementById('quiz-container').classList.add('hidden');
+      document.getElementById('pause-btn').classList.add('hidden');
+      document.getElementById('progress-indicator').classList.add('hidden');
+
+      const totalQuiz = App.stats.correct + App.stats.wrong;
+      const quizRate = totalQuiz > 0 ? Math.round((App.stats.correct / totalQuiz) * 100) : 0;
+
+      const totalTest = App.stats.testCorrect + App.stats.testWrong;
+      const testRate = totalTest > 0 ? Math.round((App.stats.testCorrect / totalTest) * 100) : '-';
+
+      document.getElementById('result-rate').textContent = `${quizRate}%`;
+      document.getElementById('test-result-rate').textContent = totalTest > 0 ? `${testRate}%` : '-';
+
+      document.getElementById('result-correct').textContent = App.stats.correct;
+      document.getElementById('result-wrong').textContent = App.stats.wrong;
+
+      let summaryText = `今回のセッションで ${totalQuiz} 単語を学習しました。`;
+      if (totalTest > 0) {
+        summaryText += ` 確認小テストの正解率は ${testRate}% でした！`;
+      }
+      document.getElementById('result-summary').textContent = summaryText;
+
+      document.getElementById('result-card').classList.remove('hidden');
+      clearResumeData();
+    }
+
+    async function saveAndReset() {
+      const btn = document.getElementById('save-btn');
+      btn.disabled = true;
+      btn.textContent = '💾 データを保存中...';
+
+      const payload = {
+        sessionId: App.sessionId,
+        results: App.results,
+        testResults: App.testResults
+      };
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        
+        showToast('✅ スプレッドシートに正常保存されました！', 'success');
+        resetToSetup();
+      } catch (err) {
+        alert('保存に失敗しました: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = '💾 再度保存を試みる';
+      }
+    }
+
+    function resetToSetup() {
+      clearResumeData();
+      document.getElementById('result-card').classList.add('hidden');
+      document.getElementById('quiz-container').classList.add('hidden');
+      document.getElementById('test-container').classList.add('hidden');
+      document.getElementById('pause-btn').classList.add('hidden');
+      document.getElementById('progress-indicator').classList.add('hidden');
+
+      document.getElementById('loading').classList.remove('hidden');
+
+      loadDataFromGAS();
+    }
+
+    function pauseQuiz() {
+      if (confirm('学習を中断して状態を保存しますか？')) {
+        const state = {
+          queue: App.queue,
+          index: App.index,
+          roundBoundaryIndex: App.roundBoundaryIndex,
+          results: App.results,
+          testQueue: App.testQueue,
+          testIndex: App.testIndex,
+          testResults: App.testResults,
+          stats: App.stats,
+          isTesting: App.isTesting,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        showToast('⏸️ 中断データを一時保存しました', 'info');
+        resetToSetup();
+      }
+    }
+
+    function checkResumeData() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const dateStr = new Date(parsed.timestamp).toLocaleString('ja-JP');
+          document.getElementById('resume-info').textContent = `保存日時: ${dateStr} （残り: ${parsed.queue.length - parsed.index} 単語）`;
+          document.getElementById('resume-card').classList.remove('hidden');
+        }
+      } catch (e) {}
+    }
+
+    function resumeQuiz() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        const state = JSON.parse(saved);
+
+        App.queue = state.queue;
+        App.index = state.index;
+        App.roundBoundaryIndex = state.roundBoundaryIndex;
+        App.results = state.results;
+        App.testQueue = state.testQueue;
+        App.testIndex = state.testIndex;
+        App.testResults = state.testResults;
+        App.stats = state.stats;
+        App.isTesting = state.isTesting;
+
+        document.getElementById('resume-card').classList.add('hidden');
+        document.getElementById('setup-card').classList.add('hidden');
+        document.getElementById('pause-btn').classList.remove('hidden');
+        document.getElementById('progress-indicator').classList.remove('hidden');
+
+        if (App.isTesting) {
+          document.getElementById('test-container').classList.remove('hidden');
+          showCurrentTestQuestion();
+        } else {
+          document.getElementById('quiz-container').classList.remove('hidden');
+          showCurrentCard();
+        }
+      } catch (e) {
+        alert('再開データの読み込みに失敗しました。');
+        clearResumeData();
+      }
+    }
+
+    function discardResumeData() {
+      clearResumeData();
+      document.getElementById('resume-card').classList.add('hidden');
+    }
+
+    function clearResumeData() {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    function setupKeyListeners() {
+      window.addEventListener('keydown', e => {
+        if (!document.getElementById('pronunciation-modal').classList.contains('hidden')) {
+          if (e.code === 'Space' || e.code === 'Enter') {
+            e.preventDefault();
+            toggleSpeechRecognition();
+          }
+          return;
+        }
+
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') {
+          return;
+        }
+
+        if (!document.getElementById('quiz-container').classList.contains('hidden')) {
+          if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+            handleAnswer(false);
+          } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+            openPronunciationCheck();
+          } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+            speakCurrentWord();
+          } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S' || e.code === 'Space') {
+            flipCard();
+          }
+        }
+
+        if (!document.getElementById('test-container').classList.contains('hidden')) {
+          if (['1', '2', '3', '4'].includes(e.key)) {
+            const idx = parseInt(e.key, 10) - 1;
+            const btns = document.querySelectorAll('.test-choice-btn');
+            if (btns[idx] && !btns[idx].disabled) {
+              btns[idx].click();
+            }
+          } else if ((e.code === 'Enter' || e.code === 'Space') && !document.getElementById('test-next-container').classList.contains('hidden')) {
+            nextTestQuestion();
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
