@@ -613,31 +613,28 @@
       rec.lang = 'en-US';
       rec.interimResults = true;
       rec.continuous = false;
-      rec.maxAlternatives = 3;
+      // ② 認識精度向上のため、候補数を最大10個まで取得するように変更
+      rec.maxAlternatives = 10;
       
       rec.onstart = function() {
         App.isRecording = true;
         App.lastRecognizedText = '';
+        App.recognizedAlternatives = []; // 候補保持用
         updatePronunciationUI('recording');
       };
       
       rec.onresult = function(event) {
-        let finalTranscript = '';
-        let interimTranscript = '';
-        
+        let candidates = [];
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
+          for (let j = 0; j < event.results[i].length; j++) {
+            candidates.push(event.results[i][j].transcript);
           }
         }
         
-        const displayText = finalTranscript || interimTranscript;
-        if (displayText) {
-          App.lastRecognizedText = displayText;
-          document.getElementById('pronunciation-result-text').textContent = displayText;
+        if (candidates.length > 0) {
+          App.lastRecognizedText = candidates[0];
+          App.recognizedAlternatives = candidates; // 全候補を保持
+          document.getElementById('pronunciation-result-text').textContent = candidates[0];
           document.getElementById('pronunciation-result-box').classList.remove('hidden');
         }
       };
@@ -649,7 +646,7 @@
         let msg = '音声認識エラーが発生しました';
         if (event.error === 'no-speech') msg = '音声が検出されませんでした。もう一度お試しください。';
         else if (event.error === 'audio-capture') msg = 'マイクが見つかりません。';
-        else if (event.error === 'not-allowed') msg = 'マイクの使用が拒否されました。ブラウザの鍵マークからマイクを許可してください。';
+        else if (event.error === 'not-allowed') msg = 'マイクの使用が拒否されました。';
         
         document.getElementById('pronunciation-status').textContent = msg;
         document.getElementById('pronunciation-status').className = 'text-center text-xs font-bold text-rose-500';
@@ -757,14 +754,17 @@
 
     function checkPronunciationResult(recognizedText) {
       const target = App.pronunciationTarget.toLowerCase().trim();
-      const recognized = recognizedText.toLowerCase().replace(/[.,!?;:'"]/g, '').trim();
       
-      let isCorrect = false;
-      const words = recognized.split(/\s+/);
-      
-      if (recognized === target || words.includes(target)) {
-        isCorrect = true;
-      }
+      // ② 取得したすべての認識候補（alternatives）の中に正解が含まれているかチェック
+      const candidates = App.recognizedAlternatives && App.recognizedAlternatives.length > 0 
+        ? App.recognizedAlternatives 
+        : [recognizedText];
+    
+      let isCorrect = candidates.some(text => {
+        const cleaned = text.toLowerCase().replace(/[.,!?;:'"]/g, '').trim();
+        const words = cleaned.split(/\s+/);
+        return cleaned === target || words.includes(target);
+      });
       
       const judgeBox = document.getElementById('pronunciation-judge-box');
       const judgeMsg = document.getElementById('pronunciation-judge-message');
@@ -778,11 +778,10 @@
         judgeMsg.textContent = '✅ 完璧な発音です！';
         judgeMsg.className = 'text-xs font-bold text-center py-2 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200';
         
-        // 合格ボタンを完全に有効化し、フォーカスを移動
         passBtn.disabled = false;
         passBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         passBtn.classList.add('hover:bg-emerald-600');
-        passBtn.focus(); // 🔑 Enterキーを確実に発火させるためフォーカスを当てる
+        passBtn.focus();
         
         retryBtn.classList.add('hidden');
         speakText('Perfect!');
@@ -1298,10 +1297,12 @@
     
       const item = App.queue[App.index];
       const total = App.roundBoundaryIndex;
-      const currentNum = Math.min(App.index + 1, total);
+      // ① 覚えた数（正解数）を取得
+      const learnedCount = App.stats.correct || 0;
     
-      document.getElementById('progress-indicator').textContent = `${currentNum} / ${total}`;
-      document.getElementById('progress-bar').style.width = `${(currentNum / total) * 100}%`;
+      // ① フォーマットを「12 (覚えた数) / 46」に変更
+      document.getElementById('progress-indicator').textContent = `${learnedCount} / ${total}`;
+      document.getElementById('progress-bar').style.width = `${(Math.min(App.index + 1, total) / total) * 100}%`;
     
       document.getElementById('card-stage').textContent = item.stage;
       document.getElementById('card-importance').textContent = item.importance;
@@ -1447,21 +1448,14 @@
       const escapedEx = escapeHtml(exampleText);
       const cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-      // 語形変化（-s, -ed, -ing など）にも対応するため、3文字以上の場合は語幹部分で部分一致検索
-      let patternStr = cleanWord;
-      if (cleanWord.length > 3) {
-        const stem = cleanWord.slice(0, Math.max(3, cleanWord.length - 2));
-        patternStr = `${stem}[a-zA-Z]*`;
-      }
+      // ③ 単語境界（\b）を活用し、他単語の部分一致（stretch/stress, publish/public）を排除
+      // 複数形・過去形などの語尾変化（s, ed, ing, es, d）のみを許容する正規表現パターン
+      const regex = new RegExp(`\\b(${cleanWord}(?:s|ed|ing|es|d)?)\\b`, 'gi');
     
-      const regex = new RegExp(`(${patternStr})`, 'gi');
-    
-      // 該当箇所を太字化
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
     }
 
     function showCurrentTestQuestion() {
-      // タイマー初期化
       if (App.testTimer) clearInterval(App.testTimer);
       App.testSecondsLeft = 15;
       App.testStartTime = Date.now();
@@ -1471,7 +1465,6 @@
         App.testSecondsLeft--;
         updateTestTimerUI();
         if (App.testSecondsLeft <= 0) {
-          // 15秒経過時は赤色表示へ変更
           document.getElementById('test-timer-badge').className = 'text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse';
           document.getElementById('test-timer-badge').textContent = '⏱️ 時間切れ (要復習扱い)';
         }
@@ -1483,15 +1476,13 @@
       document.getElementById('test-progress').textContent = `${App.testIndex + 1} / ${total}`;
       document.getElementById('test-word-label').textContent = item.word;
     
-      // 💬 例文をランダム取得（複数存在する場合）
       let detail = {};
       if (item.details && item.details.length > 0) {
         const randomIndex = Math.floor(Math.random() * item.details.length);
         detail = item.details[randomIndex];
-        App.currentTestDetail = detail; // 判定・音声再生用に保持
+        App.currentTestDetail = detail;
       }
       
-      // ✍️ 該当単語を太字化して挿入
       const exampleEl = document.getElementById('test-example');
       exampleEl.innerHTML = highlightWordInExample(detail.exampleEn, item.word);
     
@@ -1503,12 +1494,32 @@
       document.getElementById('test-next-container').classList.add('hidden');
     
       const correctMeaning = detail.meaningEn || 'Correct meaning';
-      const dummyChoices = App.allMeaningEnList
-        .filter(m => m !== correctMeaning)
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 3);
+      
+      // ④ 「あてはまるものがない (None of the above)」をランダムで追加するロジック
+      const NONE_OPTION = "あてはまるものがない (None of the above)";
+      const includeNone = Math.random() < 0.25; // 25%の確率で出現
     
-      const allChoices = [correctMeaning, ...dummyChoices].sort(() => Math.random() - 0.5);
+      let dummyChoices = App.allMeaningEnList
+        .filter(m => m !== correctMeaning)
+        .sort(() => Math.random() - 0.5);
+    
+      let choices = [];
+      if (includeNone) {
+        // 正解が「あてはまるものがない」になるパターンと、ダミー選択肢として入るパターン
+        const isNoneCorrect = Math.random() < 0.33; // 出現時の1/3で正解にする
+        if (isNoneCorrect) {
+          choices = [NONE_OPTION, ...dummyChoices.slice(0, 3)];
+          App.currentTestCorrectAnswer = NONE_OPTION;
+        } else {
+          choices = [correctMeaning, NONE_OPTION, ...dummyChoices.slice(0, 2)];
+          App.currentTestCorrectAnswer = correctMeaning;
+        }
+      } else {
+        choices = [correctMeaning, ...dummyChoices.slice(0, 3)];
+        App.currentTestCorrectAnswer = correctMeaning;
+      }
+    
+      const allChoices = choices.sort(() => Math.random() - 0.5);
     
       const choicesContainer = document.getElementById('test-choices');
       choicesContainer.innerHTML = '';
@@ -1516,7 +1527,7 @@
       allChoices.forEach((choiceText, idx) => {
         const btn = document.createElement('button');
         btn.className = 'test-choice-btn w-full bg-white hover:bg-indigo-50/50 border-2 border-slate-200 rounded-xl p-3.5 text-left text-xs font-semibold text-slate-800 transition flex items-center space-x-2';
-        btn.onclick = () => selectTestChoice(btn, choiceText === correctMeaning, correctMeaning);
+        btn.onclick = () => selectTestChoice(btn, choiceText === App.currentTestCorrectAnswer, App.currentTestCorrectAnswer);
         btn.innerHTML = `
           <span class="w-6 h-6 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-xs shrink-0">${idx + 1}</span>
           <span class="flex-grow">${escapeHtml(choiceText)}</span>
@@ -1623,25 +1634,30 @@
       document.getElementById('quiz-container').classList.add('hidden');
       document.getElementById('pause-btn').classList.add('hidden');
       document.getElementById('progress-indicator').classList.add('hidden');
-
-      const totalQuiz = App.stats.correct + App.stats.wrong;
-      const quizRate = totalQuiz > 0 ? Math.round((App.stats.correct / totalQuiz) * 100) : 0;
-
+    
+      // ⑤ 今回のセッションで「カード学習で覚えたユニーク単語数」と「要復習（まだ）になった数」を集計
+      const totalStudied = App.roundBoundaryIndex; // 初期キューの総数
+      const learnedCount = App.stats.correct || 0; 
+      const needReviewCount = Math.max(0, totalStudied - learnedCount);
+    
       const totalTest = App.stats.testCorrect + App.stats.testWrong;
       const testRate = totalTest > 0 ? Math.round((App.stats.testCorrect / totalTest) * 100) : '-';
-
+    
+      const quizRate = totalStudied > 0 ? Math.round((learnedCount / totalStudied) * 100) : 0;
+    
       document.getElementById('result-rate').textContent = `${quizRate}%`;
       document.getElementById('test-result-rate').textContent = totalTest > 0 ? `${testRate}%` : '-';
-
-      document.getElementById('result-correct').textContent = App.stats.correct;
-      document.getElementById('result-wrong').textContent = App.stats.wrong;
-
-      let summaryText = `今回のセッションで ${totalQuiz} 単語を学習しました。`;
+    
+      // ⑤ 覚えた数と要復習の数を正確な値へ修正
+      document.getElementById('result-correct').textContent = learnedCount;
+      document.getElementById('result-wrong').textContent = needReviewCount;
+    
+      let summaryText = `今回のセッションで ${totalStudied} 単語を学習しました。`;
       if (totalTest > 0) {
         summaryText += ` 確認小テストの正解率は ${testRate}% でした！`;
       }
       document.getElementById('result-summary').textContent = summaryText;
-
+    
       document.getElementById('result-card').classList.remove('hidden');
       clearResumeData();
     }
