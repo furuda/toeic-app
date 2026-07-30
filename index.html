@@ -683,12 +683,13 @@
       passBtn.disabled = true;
       passBtn.classList.add('opacity-50', 'cursor-not-allowed');
       passBtn.classList.remove('hover:bg-emerald-600');
+      passBtn.innerHTML = '⭕️ 合格！次へ進む <span class="text-xs opacity-75">(Enter)</span>';
       
       const skipBtn = document.getElementById('pronunciation-skip-btn');
       skipBtn.className = "w-full text-slate-400 hover:text-slate-600 font-semibold py-1.5 text-[11px] transition rounded-lg";
       skipBtn.textContent = "発音チェックをスキップ";
-
-      document.getElementById('pronunciation-status').textContent = 'マイクをタップして録音開始';
+    
+      document.getElementById('pronunciation-status').textContent = 'マイクをタップして録音開始 (Space)';
       document.getElementById('pronunciation-status').className = 'text-center text-xs font-bold text-slate-500';
       
       document.getElementById('pronunciation-modal').classList.remove('hidden');
@@ -742,13 +743,13 @@
       if (state === 'recording') {
         btn.classList.add('recording-pulse', 'bg-rose-600');
         btn.classList.remove('bg-rose-500');
-        status.textContent = '🔴 録音中...（発音し終わったらもう一度タップ）';
+        status.textContent = '🔴 録音中...（終わったらタップまたは Space）';
         status.className = 'text-center text-xs font-bold text-rose-500';
       } else {
         btn.classList.remove('recording-pulse', 'bg-rose-600');
         btn.classList.add('bg-rose-500');
         if (document.getElementById('pronunciation-judge-box').classList.contains('hidden')) {
-          status.textContent = 'マイクをタップして録音開始';
+          status.textContent = 'マイクをタップして録音開始 (Space)';
           status.className = 'text-center text-xs font-bold text-slate-500';
         }
       }
@@ -1792,18 +1793,28 @@
 
     function setupKeyListeners() {
       window.addEventListener('keydown', e => {
-        if (!document.getElementById('pronunciation-modal').classList.contains('hidden')) {
-          if (e.code === 'Space' || e.code === 'Enter') {
-            e.preventDefault();
+        // 🎤 発音チェックモーダル表示中のショートカットキー処理
+        const pronModal = document.getElementById('pronunciation-modal');
+        if (pronModal && !pronModal.classList.contains('hidden')) {
+          if (e.code === 'Space') {
+            e.preventDefault(); // ページスクロール防止
             toggleSpeechRecognition();
+          } else if (e.code === 'Enter') {
+            e.preventDefault();
+            const passBtn = document.getElementById('pronunciation-pass-btn');
+            // 合格ボタンが有効化されている（disabledでない）場合のみ実行
+            if (passBtn && !passBtn.disabled) {
+              pronunciationPassed();
+            }
           }
           return;
         }
-
+    
         if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') {
           return;
         }
-
+    
+        // フラッシュカード画面での操作
         if (!document.getElementById('quiz-container').classList.contains('hidden')) {
           if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
             handleAnswer(false);
@@ -1811,11 +1822,12 @@
             handleKnownWordClick();
           } else if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
             speakCurrentWord();
-          } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S' || e.code === 'Space') {
+          } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
             flipCard();
           }
         }
-
+    
+        // 小テスト画面での操作
         if (!document.getElementById('test-container').classList.contains('hidden')) {
           if (['1', '2', '3', '4'].includes(e.key)) {
             const idx = parseInt(e.key, 10) - 1;
