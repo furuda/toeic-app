@@ -1440,10 +1440,20 @@
     function highlightWordInExample(exampleText, wordToHighlight) {
       if (!exampleText) return 'No example available.';
       if (!wordToHighlight) return escapeHtml(exampleText);
-
+    
       const escapedEx = escapeHtml(exampleText);
-      const regex = new RegExp(`\\b(${wordToHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi');
-
+      const cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+      // 語形変化（-s, -ed, -ing など）にも対応するため、3文字以上の場合は語幹部分で部分一致検索
+      let patternStr = cleanWord;
+      if (cleanWord.length > 3) {
+        const stem = cleanWord.slice(0, Math.max(3, cleanWord.length - 2));
+        patternStr = `${stem}[a-zA-Z]*`;
+      }
+    
+      const regex = new RegExp(`(${patternStr})`, 'gi');
+    
+      // 該当箇所を太字化
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
     }
 
@@ -1674,8 +1684,12 @@
       loadDataFromGAS();
     }
 
+    // ⏸️ 中断ボタン押下時の関数
     function pauseQuiz() {
       if (confirm('学習を中断して状態を保存しますか？')) {
+        // タイマーが動いている場合は停止
+        if (App.testTimer) clearInterval(App.testTimer);
+    
         const state = {
           queue: App.queue,
           index: App.index,
@@ -1688,45 +1702,72 @@
           isTesting: App.isTesting,
           timestamp: new Date().toISOString()
         };
+        
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         showToast('⏸️ 中断データを一時保存しました', 'info');
-        resetToSetup();
+    
+        // クイズ/テスト画面を非表示にしてTOP画面に戻る（resetToSetupは呼ばない）
+        document.getElementById('quiz-container').classList.add('hidden');
+        document.getElementById('test-container').classList.add('hidden');
+        document.getElementById('pause-btn').classList.add('hidden');
+        document.getElementById('progress-indicator').classList.add('hidden');
+        
+        document.getElementById('setup-card').classList.remove('hidden');
+    
+        // 中断カードの表示更新
+        checkResumeData();
       }
     }
 
+    // 🔍 中断データの有無をチェックしてカードを表示する関数
     function checkResumeData() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
           const dateStr = new Date(parsed.timestamp).toLocaleString('ja-JP');
-          document.getElementById('resume-info').textContent = `保存日時: ${dateStr} （残り: ${parsed.queue.length - parsed.index} 単語）`;
+          
+          let remainingCount = 0;
+          if (parsed.isTesting) {
+            remainingCount = (parsed.testQueue ? parsed.testQueue.length : 0) - (parsed.testIndex || 0);
+          } else {
+            remainingCount = (parsed.queue ? parsed.queue.length : 0) - (parsed.index || 0);
+          }
+    
+          document.getElementById('resume-info').textContent = 
+            `保存日時: ${dateStr} （モード: ${parsed.isTesting ? '確認小テスト' : 'カード暗記'} / 残り: ${Math.max(0, remainingCount)} 単語）`;
+          
           document.getElementById('resume-card').classList.remove('hidden');
+        } else {
+          document.getElementById('resume-card').classList.add('hidden');
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('Resume check error:', e);
+      }
     }
 
+    // 🚀 続きから再開する関数
     function resumeQuiz() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) return;
         const state = JSON.parse(saved);
-
-        App.queue = state.queue;
-        App.index = state.index;
-        App.roundBoundaryIndex = state.roundBoundaryIndex;
-        App.results = state.results;
-        App.testQueue = state.testQueue;
-        App.testIndex = state.testIndex;
-        App.testResults = state.testResults;
-        App.stats = state.stats;
-        App.isTesting = state.isTesting;
-
+    
+        App.queue = state.queue || [];
+        App.index = state.index || 0;
+        App.roundBoundaryIndex = state.roundBoundaryIndex || 0;
+        App.results = state.results || [];
+        App.testQueue = state.testQueue || [];
+        App.testIndex = state.testIndex || 0;
+        App.testResults = state.testResults || [];
+        App.stats = state.stats || { correct: 0, wrong: 0, testCorrect: 0, testWrong: 0 };
+        App.isTesting = !!state.isTesting;
+    
         document.getElementById('resume-card').classList.add('hidden');
         document.getElementById('setup-card').classList.add('hidden');
         document.getElementById('pause-btn').classList.remove('hidden');
         document.getElementById('progress-indicator').classList.remove('hidden');
-
+    
         if (App.isTesting) {
           document.getElementById('test-container').classList.remove('hidden');
           showCurrentTestQuestion();
