@@ -1296,13 +1296,16 @@
       card.classList.remove('rotate-y-180', 'swipe-left', 'swipe-right');
     
       const item = App.queue[App.index];
-      const total = App.roundBoundaryIndex;
-      // ① 覚えた数（正解数）を取得
-      const learnedCount = App.stats.correct || 0;
+      const total = App.roundBoundaryIndex; // 今回の対象全単語数
+      const learnedCount = App.stats.correct || 0; // 覚えた数
     
-      // ① フォーマットを「12 (覚えた数) / 46」に変更
-      document.getElementById('progress-indicator').textContent = `${learnedCount} / ${total}`;
-      document.getElementById('progress-bar').style.width = `${(Math.min(App.index + 1, total) / total) * 100}%`;
+      // 12 (覚えた数) / 46 の表示形式に変更
+      const indicatorEl = document.getElementById('progress-indicator');
+      indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
+    
+      // プログレスバー（進行率）
+      const progressPercent = total > 0 ? Math.min(100, Math.round((learnedCount / total) * 100)) : 0;
+      document.getElementById('progress-bar').style.width = `${progressPercent}%`;
     
       document.getElementById('card-stage').textContent = item.stage;
       document.getElementById('card-importance').textContent = item.importance;
@@ -1427,16 +1430,29 @@
     function startTestSession() {
       document.getElementById('quiz-container').classList.add('hidden');
       
+      // 重複を排除した小テストキューの整理
+      const uniqueTestQueue = [];
+      const seenIds = new Set();
+      
+      App.testQueue.forEach(item => {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          uniqueTestQueue.push(item);
+        }
+      });
+    
+      App.testQueue = uniqueTestQueue;
+    
       if (App.testQueue.length === 0) {
         showResults();
         return;
       }
-
+    
       App.isTesting = true;
       App.testIndex = 0;
       App.testResults = [];
       App.testQueue.sort(() => Math.random() - 0.5);
-
+    
       document.getElementById('test-container').classList.remove('hidden');
       showCurrentTestQuestion();
     }
@@ -1446,11 +1462,16 @@
       if (!wordToHighlight) return escapeHtml(exampleText);
     
       const escapedEx = escapeHtml(exampleText);
-      const cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      let cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-      // ③ 単語境界（\b）を活用し、他単語の部分一致（stretch/stress, publish/public）を排除
-      // 複数形・過去形などの語尾変化（s, ed, ing, es, d）のみを許容する正規表現パターン
-      const regex = new RegExp(`\\b(${cleanWord}(?:s|ed|ing|es|d)?)\\b`, 'gi');
+      // 末尾が e の場合 (例: assume -> assum)
+      let stem = cleanWord;
+      if (cleanWord.endsWith('e')) {
+        stem = cleanWord.slice(0, -1);
+      }
+    
+      // 完全一致、または語尾変化(s, ed, ing, es, d, 語尾e脱落ing/ed)に対応
+      const regex = new RegExp(`\\b(?:${cleanWord}(?:s|ed|ing|es|d)?|${stem}(?:ing|ed|es|er|or)?)\\b`, 'gi');
     
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
     }
@@ -1473,6 +1494,7 @@
       const item = App.testQueue[App.testIndex];
       const total = App.testQueue.length;
     
+      // 小テストの正確な進捗表示 (例: 1 / 38)
       document.getElementById('test-progress').textContent = `${App.testIndex + 1} / ${total}`;
       document.getElementById('test-word-label').textContent = item.word;
     
@@ -1494,10 +1516,8 @@
       document.getElementById('test-next-container').classList.add('hidden');
     
       const correctMeaning = detail.meaningEn || 'Correct meaning';
-      
-      // ④ 「あてはまるものがない (None of the above)」をランダムで追加するロジック
       const NONE_OPTION = "あてはまるものがない (None of the above)";
-      const includeNone = Math.random() < 0.25; // 25%の確率で出現
+      const includeNone = Math.random() < 0.25;
     
       let dummyChoices = App.allMeaningEnList
         .filter(m => m !== correctMeaning)
@@ -1505,8 +1525,7 @@
     
       let choices = [];
       if (includeNone) {
-        // 正解が「あてはまるものがない」になるパターンと、ダミー選択肢として入るパターン
-        const isNoneCorrect = Math.random() < 0.33; // 出現時の1/3で正解にする
+        const isNoneCorrect = Math.random() < 0.33;
         if (isNoneCorrect) {
           choices = [NONE_OPTION, ...dummyChoices.slice(0, 3)];
           App.currentTestCorrectAnswer = NONE_OPTION;
