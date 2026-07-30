@@ -311,7 +311,10 @@
             class="w-full bg-emerald-500 text-white font-bold py-3 rounded-xl text-sm shadow transition opacity-50 cursor-not-allowed">
             ⭕️ 合格！次へ進む
           </button>
-          <button onclick="skipPronunciationCheck()" class="w-full text-slate-400 hover:text-slate-600 font-semibold py-1 text-[11px] transition underline">
+          
+          <!-- スキップボタン（3回失敗で有効化） -->
+          <button id="pronunciation-skip-btn" onclick="skipPronunciationCheck()" 
+            class="w-full text-slate-400 hover:text-slate-600 font-semibold py-1.5 text-[11px] transition rounded-lg">
             発音チェックをスキップ（非推奨）
           </button>
         </div>
@@ -509,7 +512,8 @@
       recognition: null,
       isRecording: false,
       pronunciationTarget: '',
-      lastRecognizedText: ''
+      lastRecognizedText: '',
+      pronunciationFailCount: 0 // 🎤 発音失敗カウントを追加
     };
 
     function escapeHtml(str) {
@@ -544,7 +548,7 @@
     }
 
     // ============================================
-    // 🎤 発音チェック機能（GitHub Pagesで完全稼働）
+    // 🎤 発音チェック機能（3回ミスでスキップ可能）
     // ============================================
     function createSpeechRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -616,6 +620,7 @@
       
       App.pronunciationTarget = item.word;
       App.lastRecognizedText = '';
+      App.pronunciationFailCount = 0; // 失敗カウント初期化
       
       document.getElementById('pronunciation-target-word').textContent = item.word;
       document.getElementById('pronunciation-result-box').classList.add('hidden');
@@ -627,6 +632,11 @@
       passBtn.classList.add('opacity-50', 'cursor-not-allowed');
       passBtn.classList.remove('hover:bg-emerald-600');
       
+      // スキップボタン初期状態（目立たない状態）
+      const skipBtn = document.getElementById('pronunciation-skip-btn');
+      skipBtn.className = "w-full text-slate-400 hover:text-slate-600 font-semibold py-1.5 text-[11px] transition rounded-lg";
+      skipBtn.textContent = "発音チェックをスキップ（非推奨）";
+
       document.getElementById('pronunciation-status').textContent = 'マイクをタップして録音開始';
       document.getElementById('pronunciation-status').className = 'text-center text-xs font-bold text-slate-500';
       
@@ -708,6 +718,7 @@
       const judgeMsg = document.getElementById('pronunciation-judge-message');
       const retryBtn = document.getElementById('pronunciation-retry-btn');
       const passBtn = document.getElementById('pronunciation-pass-btn');
+      const skipBtn = document.getElementById('pronunciation-skip-btn');
       
       judgeBox.classList.remove('hidden');
       
@@ -722,7 +733,17 @@
         retryBtn.classList.add('hidden');
         speakText('Perfect!');
       } else {
-        judgeMsg.innerHTML = `❌ 「${escapeHtml(recognizedText)}」と認識されました<br><span class="text-[10px] font-normal">正しく発音してもう一度チャレンジしましょう</span>`;
+        App.pronunciationFailCount++; // 失敗数を加算
+        
+        let extraNotice = '';
+        if (App.pronunciationFailCount >= 3) {
+          // 3回以上失敗した場合、スキップボタンを目立たせる
+          skipBtn.className = "w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 rounded-xl text-xs transition shadow animate-bounce";
+          skipBtn.textContent = "⏩ 3回失敗のためスキップして次へ進む";
+          extraNotice = `<br><span class="text-[10px] text-amber-700 font-bold">⚠️ 3回ミスしたためスキップが可能になりました</span>`;
+        }
+
+        judgeMsg.innerHTML = `❌ 「${escapeHtml(recognizedText)}」と認識されました (${App.pronunciationFailCount}回目)${extraNotice}<br><span class="text-[10px] font-normal">正しく発音してもう一度チャレンジしましょう</span>`;
         judgeMsg.className = 'text-xs font-bold text-center py-2 rounded-lg bg-rose-100 text-rose-700 border border-rose-200';
         
         retryBtn.classList.remove('hidden');
@@ -737,9 +758,14 @@
     }
 
     function skipPronunciationCheck() {
-      if (confirm('発音チェックをスキップしますか？')) {
+      if (App.pronunciationFailCount >= 3) {
         closePronunciationModal();
         handleAnswer(true);
+      } else {
+        if (confirm('発音チェックをスキップしますか？（3回ミスするとワンタップでスキップ可能になります）')) {
+          closePronunciationModal();
+          handleAnswer(true);
+        }
       }
     }
 
@@ -1277,6 +1303,18 @@
       showCurrentTestQuestion();
     }
 
+    // ✍️ 小テスト機能：例文内の対象単語だけを太字化
+    function highlightWordInExample(exampleText, wordToHighlight) {
+      if (!exampleText) return 'No example available.';
+      if (!wordToHighlight) return escapeHtml(exampleText);
+
+      const escapedEx = escapeHtml(exampleText);
+      const regex = new RegExp(`\\b(${wordToHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi');
+
+      // 対象単語を太字(<strong>)＋下線＋色付けで強調
+      return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
+    }
+
     function showCurrentTestQuestion() {
       const item = App.testQueue[App.testIndex];
       const total = App.testQueue.length;
@@ -1285,7 +1323,11 @@
       document.getElementById('test-word-label').textContent = item.word;
 
       const detail = (item.details && item.details[0]) ? item.details[0] : {};
-      document.getElementById('test-example').textContent = detail.exampleEn || 'No example available.';
+      
+      // ✍️ 例文内の質問単語だけを太字化してセット
+      const exampleEl = document.getElementById('test-example');
+      exampleEl.innerHTML = highlightWordInExample(detail.exampleEn, item.word);
+
       document.getElementById('test-meaning-ja').textContent = detail.meaningJa || 'ー';
       document.getElementById('test-example-ja').textContent = detail.exampleJa || 'ー';
 
