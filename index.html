@@ -778,9 +778,11 @@
         judgeMsg.textContent = '✅ 完璧な発音です！';
         judgeMsg.className = 'text-xs font-bold text-center py-2 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200';
         
+        // 合格ボタンを完全に有効化し、フォーカスを移動
         passBtn.disabled = false;
         passBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         passBtn.classList.add('hover:bg-emerald-600');
+        passBtn.focus(); // 🔑 Enterキーを確実に発火させるためフォーカスを当てる
         
         retryBtn.classList.add('hidden');
         speakText('Perfect!');
@@ -793,7 +795,7 @@
           skipBtn.textContent = "⏩ 3回失敗のためスキップして次へ進む";
           extraNotice = `<br><span class="text-[10px] text-amber-700 font-bold">⚠️ 3回ミスしたためスキップが可能になりました</span>`;
         }
-
+    
         judgeMsg.innerHTML = `❌ 「${escapeHtml(recognizedText)}」と認識されました (${App.pronunciationFailCount}回目)${extraNotice}<br><span class="text-[10px] font-normal">正しく発音してもう一度チャレンジしましょう</span>`;
         judgeMsg.className = 'text-xs font-bold text-center py-2 rounded-lg bg-rose-100 text-rose-700 border border-rose-200';
         
@@ -1793,17 +1795,21 @@
 
     function setupKeyListeners() {
       window.addEventListener('keydown', e => {
+        // IME入力中（変換中）は誤動作防止のためスキップ
+        if (e.isComposing) return;
+    
         // 🎤 発音チェックモーダル表示中のショートカットキー処理
         const pronModal = document.getElementById('pronunciation-modal');
         if (pronModal && !pronModal.classList.contains('hidden')) {
           if (e.code === 'Space') {
             e.preventDefault(); // ページスクロール防止
             toggleSpeechRecognition();
-          } else if (e.code === 'Enter') {
+          } else if (e.code === 'Enter' || e.key === 'Enter') {
             e.preventDefault();
             const passBtn = document.getElementById('pronunciation-pass-btn');
-            // 合格ボタンが有効化されている（disabledでない）場合のみ実行
-            if (passBtn && !passBtn.disabled) {
+            
+            // 合格ボタンが存在し、disabled属性が解除されている場合のみ次へ進む
+            if (passBtn && !passBtn.disabled && !passBtn.classList.contains('opacity-50')) {
               pronunciationPassed();
             }
           }
