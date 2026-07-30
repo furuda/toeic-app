@@ -87,7 +87,7 @@
     <!-- メインTOP画面 -->
     <div id="setup-card" class="space-y-5 hidden">
       
-      <!-- 🌟 1. 進捗状況可視化ダッシュボード -->
+      <!-- 学習進捗ダッシュボード -->
       <div id="dashboard-container" class="bg-white rounded-2xl shadow-md p-5 space-y-4 border border-slate-200">
         <div class="flex items-center justify-between border-b pb-2">
           <h2 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
@@ -134,12 +134,11 @@
             <span class="transform group-open:rotate-180 transition-transform">▼</span>
           </summary>
           <div id="stage-breakdown-list" class="p-3 pt-0 space-y-2 max-h-56 overflow-y-auto text-xs border-t border-slate-200/60 mt-1">
-            <!-- JS動的生成 -->
           </div>
         </details>
       </div>
 
-      <!-- 🌟 2. 弱点克服セクション（トグル化対応） -->
+      <!-- 弱点克服セクション -->
       <div id="weakness-section" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
         <details class="group" open>
           <summary class="flex items-center justify-between p-5 cursor-pointer select-none list-none">
@@ -149,7 +148,6 @@
             <div class="flex items-center space-x-2">
               <select id="weakness-stage-select" onchange="renderWeaknessChart()" onclick="event.stopPropagation()" class="bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold px-2 py-1 outline-none text-slate-700">
                 <option value="ALL">全ステージ TOP 10</option>
-                <!-- JSでStage 01〜24を動的追加 -->
               </select>
               <button id="start-weak-btn" onclick="event.stopPropagation(); startWeaknessQuiz();" class="hidden text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold px-2.5 py-1 rounded-lg shadow transition active:scale-95 whitespace-nowrap">
                 🎯 弱点学習
@@ -158,12 +156,11 @@
             </div>
           </summary>
           <div id="weakness-chart-container" class="px-5 pb-5 space-y-2.5 border-t border-slate-100 pt-3">
-            <!-- JS動的生成 -->
           </div>
         </details>
       </div>
 
-      <!-- 🌟 3. 学習条件設定カード -->
+      <!-- 学習条件設定カード -->
       <div class="bg-white rounded-2xl shadow-md p-5 space-y-4 border border-slate-200">
         <div class="flex items-center justify-between border-b pb-2">
           <h2 class="text-base font-bold text-slate-800 flex items-center gap-1.5">
@@ -182,7 +179,6 @@
             </div>
           </div>
           <div id="stage-chips-grid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200">
-            <!-- JS動的生成 -->
           </div>
         </div>
 
@@ -228,7 +224,7 @@
 
     </div>
 
-    <!-- 対応②：ステージ内単語一覧表示 モーダル -->
+    <!-- ステージ内単語一覧表示 モーダル -->
     <div id="stage-words-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
       <div class="bg-white rounded-2xl shadow-2xl p-5 max-w-lg w-full space-y-3 border border-slate-200 flex flex-col max-h-[85vh]">
         <div class="flex justify-between items-center border-b pb-2">
@@ -239,7 +235,6 @@
         </div>
 
         <div id="stage-words-list" class="space-y-2 overflow-y-auto flex-grow text-xs pr-1">
-          <!-- JS動的生成 -->
         </div>
 
         <button onclick="closeStageWordsModal()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-xl text-xs transition">
@@ -248,7 +243,7 @@
       </div>
     </div>
 
-    <!-- 🌟 4. 設定モーダル（発音機能・発音チェックON/OFF対応③） -->
+    <!-- 設定モーダル -->
     <div id="tts-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
       <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4 border border-slate-200">
         <div class="flex justify-between items-center border-b pb-2">
@@ -259,7 +254,6 @@
         </div>
 
         <div class="space-y-3">
-          <!-- 対応③：発音チェックのON/OFF指定スイッチ -->
           <div class="flex items-center justify-between pb-2 border-b border-slate-100">
             <div>
               <span class="text-xs font-bold text-slate-800 block">🎤 発音チェックを行う</span>
@@ -300,7 +294,7 @@
       </div>
     </div>
 
-    <!-- 🎤 5. 発音チェックモーダル -->
+    <!-- 発音チェックモーダル -->
     <div id="pronunciation-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
       <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-5 border border-slate-200 relative">
         <div class="flex justify-between items-center border-b pb-3">
@@ -403,7 +397,6 @@
               </button>
             </div>
             <div id="card-derived-list" class="space-y-2.5 text-left flex-grow">
-              <!-- JS動的生成 -->
             </div>
             <div class="mt-3 pt-2 border-t border-indigo-200 text-xs text-indigo-600 text-center">
               次回復習予定: <span id="card-next-review">-</span>
@@ -418,7 +411,6 @@
         <button onclick="handleAnswer(false)" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 md:py-4 text-sm md:text-base rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-2">
           <span>❌</span> <span>まだ（要復習）</span>
         </button>
-        <!-- 判定関数を呼び出すように変更 -->
         <button onclick="handleKnownWordClick()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95 flex items-center justify-center space-x-1">
           <span>⭕️</span> <span id="btn-known-label">覚えた！</span>
         </button>
@@ -429,11 +421,10 @@
       </p>
     </div>
 
-    <!-- 小テスト画面（タイマー部分抜粋） -->
+    <!-- 小テスト画面 -->
     <div id="test-container" class="hidden flex-grow flex flex-col justify-center space-y-4 my-auto">
       <div class="flex justify-between items-center border-b pb-2">
         <span class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">✍️ 確認小テスト</span>
-        <!-- ⏱️ 15秒タイマー表示領域を追加 -->
         <span id="test-timer-badge" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">⏱️ 15秒</span>
         <span id="test-progress" class="text-xs font-bold text-indigo-600">0 / 0</span>
       </div>
@@ -474,7 +465,6 @@
       </div>
 
       <div id="test-choices" class="space-y-2.5">
-        <!-- JS動的生成 -->
       </div>
 
       <div id="test-next-container" class="hidden pt-2">
@@ -526,7 +516,7 @@
 
   <script>
     // 🔗 ここにご自身の GAS ウェブアプリ URL を設定してください
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbw5FOs9uHoC6uqeMezLVlXGkMnBpWPSXsOQZMUG53t89w6-EiKTue285-BqToXKpAhqPg/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzs_3QXS_ej4MCi_1X7ijCsOm0wPbB64GsWHEm-flIQKagfvlh6mKt_Mc42nV4ukRBqmw/exec";
 
     const INTERVALS = [1, 3, 7, 14, 30, 60, 90];
     const STORAGE_KEY = 'vocab_app_paused_session_v2';
@@ -548,7 +538,7 @@
       sessionId: 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
       stats: { correct: 0, wrong: 0, testCorrect: 0, testWrong: 0 },
       selectedStages: new Set(),
-      tts: { rate: 0.9, voiceURI: '', autoPlay: false, pronounceCheckEnabled: true }, // 設定③追加
+      tts: { rate: 0.9, voiceURI: '', autoPlay: false, pronounceCheckEnabled: true },
       recognition: null,
       isRecording: false,
       pronunciationTarget: '',
@@ -590,7 +580,6 @@
       }, 3000);
     }
 
-    // 対応③：「覚えた！」クリック時の振り分け関数
     function handleKnownWordClick() {
       if (App.tts.pronounceCheckEnabled) {
         openPronunciationCheck();
@@ -613,13 +602,12 @@
       rec.lang = 'en-US';
       rec.interimResults = true;
       rec.continuous = false;
-      // ② 認識精度向上のため、候補数を最大10個まで取得するように変更
       rec.maxAlternatives = 10;
       
       rec.onstart = function() {
         App.isRecording = true;
         App.lastRecognizedText = '';
-        App.recognizedAlternatives = []; // 候補保持用
+        App.recognizedAlternatives = [];
         updatePronunciationUI('recording');
       };
       
@@ -633,7 +621,7 @@
         
         if (candidates.length > 0) {
           App.lastRecognizedText = candidates[0];
-          App.recognizedAlternatives = candidates; // 全候補を保持
+          App.recognizedAlternatives = candidates;
           document.getElementById('pronunciation-result-text').textContent = candidates[0];
           document.getElementById('pronunciation-result-box').classList.remove('hidden');
         }
@@ -755,7 +743,6 @@
     function checkPronunciationResult(recognizedText) {
       const target = App.pronunciationTarget.toLowerCase().trim();
       
-      // ② 取得したすべての認識候補（alternatives）の中に正解が含まれているかチェック
       const candidates = App.recognizedAlternatives && App.recognizedAlternatives.length > 0 
         ? App.recognizedAlternatives 
         : [recognizedText];
@@ -809,14 +796,20 @@
       handleAnswer(true);
     }
 
+    // ===== 修正①：スキップ情報を渡す処理 =====
     function skipPronunciationCheck() {
+      const skipInfo = {
+        pronunciationSkipped: true,
+        pronunciationFailCount: App.pronunciationFailCount
+      };
+
       if (App.pronunciationFailCount >= 3) {
         closePronunciationModal();
-        handleAnswer(true);
+        handleAnswer(true, skipInfo);
       } else {
         if (confirm('発音チェックをスキップしますか？')) {
           closePronunciationModal();
-          handleAnswer(true);
+          handleAnswer(true, skipInfo);
         }
       }
     }
@@ -980,7 +973,7 @@
       }
 
       initStageChips();
-      initWeaknessStageSelect(); // ドロップダウン初期化
+      initWeaknessStageSelect();
       setupKeyListeners();
 
       loadDataFromGAS();
@@ -1006,7 +999,6 @@
       }
     }
 
-    // 対応①：弱点選択ドロップダウンの初期化
     function initWeaknessStageSelect() {
       const select = document.getElementById('weakness-stage-select');
       select.innerHTML = '<option value="ALL">全ステージ TOP 10</option>';
@@ -1070,7 +1062,6 @@
       checkResumeData();
     }
 
-    // 対応②：「👁️ 単語一覧」ボタン付きダッシュボード生成
     function renderDashboard() {
       const total = App.allWords.length;
       let learned = 0, review = 0, unlearned = 0;
@@ -1130,7 +1121,6 @@
       });
     }
 
-    // 対応②：ステージ内の単語一覧モーダル表示関数
     function openStageWordsModal(stageName) {
       const words = App.allWords.filter(w => w.stage === stageName);
       document.getElementById('stage-words-title').innerHTML = `<span>📚</span><span>${stageName} 単語一覧 (全 ${words.length} 単語)</span>`;
@@ -1175,7 +1165,6 @@
       document.getElementById('stage-words-modal').classList.add('hidden');
     }
 
-    // 対応①：ドロップダウンでステージ指定された弱点分析の描画
     function renderWeaknessChart() {
       const selectedStage = document.getElementById('weakness-stage-select').value;
       
@@ -1296,14 +1285,12 @@
       card.classList.remove('rotate-y-180', 'swipe-left', 'swipe-right');
     
       const item = App.queue[App.index];
-      const total = App.roundBoundaryIndex; // 今回の対象全単語数
-      const learnedCount = App.stats.correct || 0; // 覚えた数
+      const total = App.roundBoundaryIndex;
+      const learnedCount = App.stats.correct || 0;
     
-      // 12 (覚えた数) / 46 の表示形式に変更
       const indicatorEl = document.getElementById('progress-indicator');
       indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
     
-      // プログレスバー（進行率）
       const progressPercent = total > 0 ? Math.min(100, Math.round((learnedCount / total) * 100)) : 0;
       document.getElementById('progress-bar').style.width = `${progressPercent}%`;
     
@@ -1365,7 +1352,8 @@
       }
     }
 
-    function handleAnswer(isCorrect) {
+    // ===== 修正① ＆ 修正②：スキップ情報保持 + 要復習単語の小テスト追加 =====
+    function handleAnswer(isCorrect, extra = {}) {
       const card = document.getElementById('flashcard');
       const item = App.queue[App.index];
 
@@ -1391,7 +1379,8 @@
           reviewCount: nextRevCount,
           nextReviewDate: nextDateStr,
           lastReviewDate: today,
-          isCorrect: true
+          isCorrect: true,
+          ...extra   // ← スキップ情報を展開
         });
 
         if (!App.testQueue.some(x => x.id === item.id)) {
@@ -1411,10 +1400,16 @@
           reviewCount: item.reviewCount || 0,
           nextReviewDate: today,
           lastReviewDate: today,
-          isCorrect: false
+          isCorrect: false,
+          ...extra   // ← スキップ情報を展開
         });
 
         App.queue.push(item);
+
+        // ===== 修正②：要復習の単語も小テストへ追加 =====
+        if (!App.testQueue.some(x => x.id === item.id)) {
+          App.testQueue.push(item);
+        }
       }
 
       setTimeout(() => {
@@ -1430,7 +1425,6 @@
     function startTestSession() {
       document.getElementById('quiz-container').classList.add('hidden');
       
-      // 重複を排除した小テストキューの整理
       const uniqueTestQueue = [];
       const seenIds = new Set();
       
@@ -1457,6 +1451,7 @@
       showCurrentTestQuestion();
     }
 
+    // ===== 修正③：正規表現を非キャプチャからキャプチャグループに変更 =====
     function highlightWordInExample(exampleText, wordToHighlight) {
       if (!exampleText) return 'No example available.';
       if (!wordToHighlight) return escapeHtml(exampleText);
@@ -1464,14 +1459,13 @@
       const escapedEx = escapeHtml(exampleText);
       let cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
-      // 末尾が e の場合 (例: assume -> assum)
       let stem = cleanWord;
       if (cleanWord.endsWith('e')) {
         stem = cleanWord.slice(0, -1);
       }
     
-      // 完全一致、または語尾変化(s, ed, ing, es, d, 語尾e脱落ing/ed)に対応
-      const regex = new RegExp(`\\b(?:${cleanWord}(?:s|ed|ing|es|d)?|${stem}(?:ing|ed|es|er|or)?)\\b`, 'gi');
+      // (?: → ( に修正し、$1に単語が保持されるよう対応
+      const regex = new RegExp(`\\b(${cleanWord}(?:s|ed|ing|es|d)?|${stem}(?:ing|ed|es|er|or)?)\\b`, 'gi');
     
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
     }
@@ -1494,7 +1488,6 @@
       const item = App.testQueue[App.testIndex];
       const total = App.testQueue.length;
     
-      // 小テストの正確な進捗表示 (例: 1 / 38)
       document.getElementById('test-progress').textContent = `${App.testIndex + 1} / ${total}`;
       document.getElementById('test-word-label').textContent = item.word;
     
@@ -1560,18 +1553,15 @@
     }
 
     function selectTestChoice(selectedBtn, isCorrect, correctMeaningText) {
-      // タイマー停止
       if (App.testTimer) clearInterval(App.testTimer);
     
       const elapsedTime = (Date.now() - App.testStartTime) / 1000;
-      const isOverTime = elapsedTime > 15; // 15秒超え判定
+      const isOverTime = elapsedTime > 15;
     
       const choiceBtns = document.querySelectorAll('.test-choice-btn');
       choiceBtns.forEach(btn => btn.disabled = true);
     
       const item = App.testQueue[App.testIndex];
-    
-      // 15秒超えの場合は正解を選んでも「要復習扱い」に変更
       const finalStatusIsCorrect = isCorrect && !isOverTime;
     
       if (isCorrect) {
@@ -1621,7 +1611,6 @@
       if (item?.word) speakText(item.word);
     }
 
-    // ⏱️ タイマーUI更新ヘルパー関数
     function updateTestTimerUI() {
       const badge = document.getElementById('test-timer-badge');
       if (App.testSecondsLeft > 5) {
@@ -1633,7 +1622,6 @@
       }
     }
     
-    // 🔊 テスト用音声再生関数の参照先更新
     function speakTestExample() {
       const detail = App.currentTestDetail || {};
       if (detail.exampleEn) speakText(detail.exampleEn);
@@ -1654,8 +1642,7 @@
       document.getElementById('pause-btn').classList.add('hidden');
       document.getElementById('progress-indicator').classList.add('hidden');
     
-      // ⑤ 今回のセッションで「カード学習で覚えたユニーク単語数」と「要復習（まだ）になった数」を集計
-      const totalStudied = App.roundBoundaryIndex; // 初期キューの総数
+      const totalStudied = App.roundBoundaryIndex;
       const learnedCount = App.stats.correct || 0; 
       const needReviewCount = Math.max(0, totalStudied - learnedCount);
     
@@ -1667,7 +1654,6 @@
       document.getElementById('result-rate').textContent = `${quizRate}%`;
       document.getElementById('test-result-rate').textContent = totalTest > 0 ? `${testRate}%` : '-';
     
-      // ⑤ 覚えた数と要復習の数を正確な値へ修正
       document.getElementById('result-correct').textContent = learnedCount;
       document.getElementById('result-wrong').textContent = needReviewCount;
     
@@ -1722,10 +1708,8 @@
       loadDataFromGAS();
     }
 
-    // ⏸️ 中断ボタン押下時の関数
     function pauseQuiz() {
       if (confirm('学習を中断して状態を保存しますか？')) {
-        // タイマーが動いている場合は停止
         if (App.testTimer) clearInterval(App.testTimer);
     
         const state = {
@@ -1744,7 +1728,6 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         showToast('⏸️ 中断データを一時保存しました', 'info');
     
-        // クイズ/テスト画面を非表示にしてTOP画面に戻る（resetToSetupは呼ばない）
         document.getElementById('quiz-container').classList.add('hidden');
         document.getElementById('test-container').classList.add('hidden');
         document.getElementById('pause-btn').classList.add('hidden');
@@ -1752,12 +1735,10 @@
         
         document.getElementById('setup-card').classList.remove('hidden');
     
-        // 中断カードの表示更新
         checkResumeData();
       }
     }
 
-    // 🔍 中断データの有無をチェックしてカードを表示する関数
     function checkResumeData() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -1784,7 +1765,6 @@
       }
     }
 
-    // 🚀 続きから再開する関数
     function resumeQuiz() {
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
@@ -1830,20 +1810,17 @@
 
     function setupKeyListeners() {
       window.addEventListener('keydown', e => {
-        // IME入力中（変換中）は誤動作防止のためスキップ
         if (e.isComposing) return;
     
-        // 🎤 発音チェックモーダル表示中のショートカットキー処理
         const pronModal = document.getElementById('pronunciation-modal');
         if (pronModal && !pronModal.classList.contains('hidden')) {
           if (e.code === 'Space') {
-            e.preventDefault(); // ページスクロール防止
+            e.preventDefault();
             toggleSpeechRecognition();
           } else if (e.code === 'Enter' || e.key === 'Enter') {
             e.preventDefault();
             const passBtn = document.getElementById('pronunciation-pass-btn');
             
-            // 合格ボタンが存在し、disabled属性が解除されている場合のみ次へ進む
             if (passBtn && !passBtn.disabled && !passBtn.classList.contains('opacity-50')) {
               pronunciationPassed();
             }
@@ -1855,7 +1832,6 @@
           return;
         }
     
-        // フラッシュカード画面での操作
         if (!document.getElementById('quiz-container').classList.contains('hidden')) {
           if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
             handleAnswer(false);
@@ -1868,7 +1844,6 @@
           }
         }
     
-        // 小テスト画面での操作
         if (!document.getElementById('test-container').classList.contains('hidden')) {
           if (['1', '2', '3', '4'].includes(e.key)) {
             const idx = parseInt(e.key, 10) - 1;
