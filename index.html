@@ -221,6 +221,27 @@
           </div>
         </div>
 
+        <!-- 範囲指定（単語番号の小分け設定）追加部分 -->
+        <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl space-y-2">
+          <div class="flex justify-between items-center">
+            <label class="text-xs font-bold text-slate-700 flex items-center gap-1">
+              <span>🔢</span><span>ステージ内の単語番号（範囲指定）</span>
+            </label>
+            <div class="space-x-1">
+              <button type="button" onclick="setWordRange(1, 20)" class="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-200">1-20</button>
+              <button type="button" onclick="setWordRange(21, 40)" class="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-200">21-40</button>
+              <button type="button" onclick="setWordRange(41, 60)" class="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-200">41-60</button>
+              <button type="button" onclick="setWordRange(1, 0)" class="text-[10px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold px-2 py-0.5 rounded">全全指定</button>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <input type="number" id="range-start-input" onchange="updateFilteredWordCount()" placeholder="開始(例:1)" min="1" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-center text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500">
+            <span class="text-xs font-bold text-slate-400">〜</span>
+            <input type="number" id="range-end-input" onchange="updateFilteredWordCount()" placeholder="終了(例:20)" min="1" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-center text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500">
+            <span class="text-xs font-bold text-slate-500 whitespace-nowrap">番目</span>
+          </div>
+        </div>
+
         <div id="weak-count-container" class="hidden bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between">
           <label class="text-xs font-semibold text-indigo-900">指定の間違い回数：</label>
           <div class="flex items-center space-x-1.5">
@@ -1298,16 +1319,50 @@
       }
     }
 
+    /**
+     * 範囲ボタンのショートカットセット関数
+     */
+    function setWordRange(start, end) {
+      document.getElementById('range-start-input').value = start > 0 ? start : '';
+      document.getElementById('range-end-input').value = end > 0 ? end : '';
+      updateFilteredWordCount();
+    }
+
+    /**
+     * 絞り込み処理の修正版
+     */
     function filterWords() {
       const imp = document.getElementById('importance-select').value;
       const mode = document.getElementById('mode-select').value;
       const weakThreshold = parseInt(document.getElementById('weak-count-input').value, 10) || 1;
       const today = getTodayDateString();
 
+      // 範囲指定（1ベースのインデックス）
+      const rangeStart = parseInt(document.getElementById('range-start-input').value, 10);
+      const rangeEnd = parseInt(document.getElementById('range-end-input').value, 10);
+
+      // ステージごとの単語登場カウンター
+      const stageCounters = {};
+
       return App.allWords.filter(w => {
+        // ステージ内での連番（1, 2, 3...）をカウント
+        if (!stageCounters[w.stage]) {
+          stageCounters[w.stage] = 0;
+        }
+        stageCounters[w.stage]++;
+        const wordNumberInStage = stageCounters[w.stage];
+
+        // 1. ステージ選択フィルター
         if (!App.selectedStages.has(w.stage)) return false;
+
+        // 2. 重要性フィルター
         if (imp !== 'ALL' && w.importance !== imp) return false;
 
+        // 3. 範囲指定（単語番号 1〜20 など）のフィルター
+        if (!isNaN(rangeStart) && rangeStart > 0 && wordNumberInStage < rangeStart) return false;
+        if (!isNaN(rangeEnd) && rangeEnd > 0 && wordNumberInStage > rangeEnd) return false;
+
+        // 4. 学習モードフィルター
         if (mode === 'review') {
           return w.status === 2 || (w.nextReviewDate && w.nextReviewDate <= today);
         } else if (mode === 'unlearned') {
