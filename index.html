@@ -1542,11 +1542,12 @@
       showCurrentTestQuestion();
     }
 
-    // ===== 修正③：正規表現を非キャプチャからキャプチャグループに変更 =====
+    // 1. highlightWordInExample 関数（エスケープ順序とマークアップ処理の修正）
     function highlightWordInExample(exampleText, wordToHighlight) {
       if (!exampleText) return 'No example available.';
       if (!wordToHighlight) return escapeHtml(exampleText);
     
+      // 一旦テキストを安全にHTMLエスケープ
       const escapedEx = escapeHtml(exampleText);
       let cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
@@ -1555,12 +1556,12 @@
         stem = cleanWord.slice(0, -1);
       }
     
-      // (?: → ( に修正し、$1に単語が保持されるよう対応
       const regex = new RegExp(`\\b(${cleanWord}(?:s|ed|ing|es|d)?|${stem}(?:ing|ed|es|er|or)?)\\b`, 'gi');
     
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
     }
 
+    // 2. showCurrentTestQuestion 関数（onclick属性での文字バッティング防止）
     function showCurrentTestQuestion() {
       if (App.testTimer) clearInterval(App.testTimer);
       App.testSecondsLeft = 15;
@@ -1590,6 +1591,7 @@
       }
       
       const exampleEl = document.getElementById('test-example');
+      // textContent 経由ではなく安全に生成したHTMLを挿入
       exampleEl.innerHTML = highlightWordInExample(detail.exampleEn, item.word);
     
       document.getElementById('test-meaning-ja').textContent = detail.meaningJa || 'ー';
