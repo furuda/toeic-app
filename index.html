@@ -1089,10 +1089,12 @@
     }
 
     /**
-     * 今日のタスクカードの描画処理
+     * 今日のタスクカードの描画処理（表示保証ロジック強化）
      */
     function renderTodayTaskCard() {
       const card = document.getElementById('today-task-card');
+      if (!card) return;
+
       if (!App.todayProgress || !App.todayProgress.targetStage) {
         card.classList.add('hidden');
         return;
@@ -1100,6 +1102,8 @@
 
       document.getElementById('today-date-badge').textContent = App.todayProgress.date;
       document.getElementById('today-target-stage').textContent = App.todayProgress.targetStage;
+      
+      // hiddenクラスを削除して確実に可視化
       card.classList.remove('hidden');
     }
 
@@ -1377,12 +1381,13 @@
       const derivedContainer = document.getElementById('card-derived-list');
       derivedContainer.innerHTML = '';
     
+      // --- 例文の表示処理 ---
       if (item.details && item.details.length > 0) {
         item.details.forEach(d => {
           const block = document.createElement('div');
           block.className = 'bg-white/80 p-2.5 rounded-xl border border-indigo-100 text-xs space-y-1';
           
-          // ✨ 文章を安全にエンコードして属性に渡す
+          // ✨ 文章を安全にURLエンコードする
           const safeExampleEn = d.exampleEn ? encodeURIComponent(d.exampleEn) : '';
 
           block.innerHTML = `
@@ -1399,15 +1404,18 @@
         });
       }
     
+      // --- 派生語の表示処理 ---
       if (item.derived && item.derived.length > 0) {
         const derivedBlock = document.createElement('div');
         derivedBlock.className = 'bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1 mt-2';
         let html = '<div class="font-bold text-amber-800 text-[11px]">🌱 派生語:</div>';
+        
         item.derived.forEach(dr => {
+          const safeDerivedWord = encodeURIComponent(dr.derivedWord || '');
           html += `
             <div class="text-[11px] text-amber-900 flex items-center justify-between">
               <span><strong>${escapeHtml(dr.derivedWord)}</strong>: ${escapeHtml(dr.meaning)}</span>
-              <button type="button" onclick="event.stopPropagation(); speakText('${escapeHtml(dr.derivedWord).replace(/'/g, "\\'")}')" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
+              <button type="button" onclick="event.stopPropagation(); speakText(decodeURIComponent('${safeDerivedWord}'))" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
             </div>`;
         });
         derivedBlock.innerHTML = html;
