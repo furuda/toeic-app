@@ -1388,43 +1388,79 @@
       const derivedContainer = document.getElementById('card-derived-list');
       derivedContainer.innerHTML = '';
     
-      // 例文の表示処理（安全なURLエンコード適用）
+      // --- 1. 例文の表示処理（DOM操作で安全性向上） ---
       if (item.details && item.details.length > 0) {
         item.details.forEach(d => {
           const block = document.createElement('div');
           block.className = 'bg-white/80 p-2.5 rounded-xl border border-indigo-100 text-xs space-y-1';
-          
-          const safeExampleEn = d.exampleEn ? encodeURIComponent(d.exampleEn) : '';
     
-          block.innerHTML = `
-            <div class="font-bold text-slate-800">${escapeHtml(d.meaningJa)}</div>
-            ${d.meaningEn ? `<div class="text-[11px] text-slate-500 italic">${escapeHtml(d.meaningEn)}</div>` : ''}
-            ${d.exampleEn ? `
+          let html = `<div class="font-bold text-slate-800">${escapeHtml(d.meaningJa)}</div>`;
+          if (d.meaningEn) {
+            html += `<div class="text-[11px] text-slate-500 italic">${escapeHtml(d.meaningEn)}</div>`;
+          }
+    
+          if (d.exampleEn) {
+            html += `
               <div class="text-[11px] text-indigo-900 font-medium pt-1 border-t border-slate-100 flex items-start justify-between gap-1">
                 <span>💬 ${escapeHtml(d.exampleEn)}</span>
-                <button type="button" onclick="event.stopPropagation(); speakText('${safeExampleEn}')" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
-              </div>` : ''}
-            ${d.exampleJa ? `<div class="text-[10px] text-slate-500">${escapeHtml(d.exampleJa)}</div>` : ''}
-          `;
+                <button type="button" class="example-audio-btn text-xs shrink-0 hover:scale-110 transition">🔊</button>
+              </div>`;
+          }
+    
+          if (d.exampleJa) {
+            html += `<div class="text-[10px] text-slate-500">${escapeHtml(d.exampleJa)}</div>`;
+          }
+    
+          block.innerHTML = html;
+    
+          // ボタンに対して安全にイベントリスナーを設定（アポストロフィ対策）
+          if (d.exampleEn) {
+            const audioBtn = block.querySelector('.example-audio-btn');
+            if (audioBtn) {
+              audioBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                speakText(d.exampleEn);
+              });
+            }
+          }
+    
           derivedContainer.appendChild(block);
         });
       }
     
-      // 派生語の表示処理（安全なURLエンコード適用）
+      // --- 2. 派生語の表示処理（DOM操作で安全性向上） ---
       if (item.derived && item.derived.length > 0) {
         const derivedBlock = document.createElement('div');
         derivedBlock.className = 'bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1 mt-2';
-        let html = '<div class="font-bold text-amber-800 text-[11px]">🌱 派生語:</div>';
         
+        const header = document.createElement('div');
+        header.className = 'font-bold text-amber-800 text-[11px]';
+        header.textContent = '🌱 派生語:';
+        derivedBlock.appendChild(header);
+    
         item.derived.forEach(dr => {
-          const safeDerivedWord = encodeURIComponent(dr.derivedWord || '');
-          html += `
-            <div class="text-[11px] text-amber-900 flex items-center justify-between">
-              <span><strong>${escapeHtml(dr.derivedWord)}</strong>: ${escapeHtml(dr.meaning)}</span>
-              <button type="button" onclick="event.stopPropagation(); speakText('${safeDerivedWord}')" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
-            </div>`;
+          const row = document.createElement('div');
+          row.className = 'text-[11px] text-amber-900 flex items-center justify-between';
+          
+          const textSpan = document.createElement('span');
+          textSpan.innerHTML = `<strong>${escapeHtml(dr.derivedWord)}</strong>: ${escapeHtml(dr.meaning)}`;
+          row.appendChild(textSpan);
+    
+          if (dr.derivedWord) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'text-xs shrink-0 hover:scale-110 transition';
+            btn.textContent = '🔊';
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              speakText(dr.derivedWord);
+            });
+            row.appendChild(btn);
+          }
+    
+          derivedBlock.appendChild(row);
         });
-        derivedBlock.innerHTML = html;
+    
         derivedContainer.appendChild(derivedBlock);
       }
     
