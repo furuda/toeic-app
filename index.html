@@ -1381,13 +1381,17 @@
         item.details.forEach(d => {
           const block = document.createElement('div');
           block.className = 'bg-white/80 p-2.5 rounded-xl border border-indigo-100 text-xs space-y-1';
+          
+          // ✨ 文章を安全にエンコードして属性に渡す
+          const safeExampleEn = d.exampleEn ? encodeURIComponent(d.exampleEn) : '';
+
           block.innerHTML = `
             <div class="font-bold text-slate-800">${escapeHtml(d.meaningJa)}</div>
             ${d.meaningEn ? `<div class="text-[11px] text-slate-500 italic">${escapeHtml(d.meaningEn)}</div>` : ''}
             ${d.exampleEn ? `
               <div class="text-[11px] text-indigo-900 font-medium pt-1 border-t border-slate-100 flex items-start justify-between gap-1">
                 <span>💬 ${escapeHtml(d.exampleEn)}</span>
-                <button type="button" onclick="event.stopPropagation(); speakText('${escapeHtml(d.exampleEn).replace(/'/g, "\\'")}')" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
+                <button type="button" onclick="event.stopPropagation(); speakText(decodeURIComponent('${safeExampleEn}'))" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
               </div>` : ''}
             ${d.exampleJa ? `<div class="text-[10px] text-slate-500">${escapeHtml(d.exampleJa)}</div>` : ''}
           `;
