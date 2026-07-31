@@ -910,18 +910,25 @@
 
     function speakText(text) {
       if (!('speechSynthesis' in window) || !text) return;
+      
+      // decodeURIComponentでURLエンコードを解除して元の英語テキストに戻す
+      let rawText = text;
+      try {
+        rawText = decodeURIComponent(text);
+      } catch(e) {}
+    
       window.speechSynthesis.cancel();
-
-      const u = new SpeechSynthesisUtterance(text);
+    
+      const u = new SpeechSynthesisUtterance(rawText);
       u.lang = 'en-US';
       u.rate = App.tts.rate || 0.9;
-
+    
       let voices = window.speechSynthesis.getVoices();
       if (!voices || voices.length === 0) {
         populateVoices();
         voices = window.speechSynthesis.getVoices();
       }
-
+    
       let targetVoice = null;
       if (App.tts.voiceURI) {
         targetVoice = voices.find(x => x.voiceURI === App.tts.voiceURI);
@@ -931,11 +938,11 @@
                       voices.find(x => x.lang === 'en-US' || x.lang === 'en_US') ||
                       voices.find(x => x.lang.startsWith('en'));
       }
-
+    
       if (targetVoice) {
         u.voice = targetVoice;
       }
-
+    
       window.speechSynthesis.speak(u);
     }
 
@@ -1381,22 +1388,21 @@
       const derivedContainer = document.getElementById('card-derived-list');
       derivedContainer.innerHTML = '';
     
-      // --- 例文の表示処理 ---
+      // 例文の表示処理（安全なURLエンコード適用）
       if (item.details && item.details.length > 0) {
         item.details.forEach(d => {
           const block = document.createElement('div');
           block.className = 'bg-white/80 p-2.5 rounded-xl border border-indigo-100 text-xs space-y-1';
           
-          // ✨ 文章を安全にURLエンコードする
           const safeExampleEn = d.exampleEn ? encodeURIComponent(d.exampleEn) : '';
-
+    
           block.innerHTML = `
             <div class="font-bold text-slate-800">${escapeHtml(d.meaningJa)}</div>
             ${d.meaningEn ? `<div class="text-[11px] text-slate-500 italic">${escapeHtml(d.meaningEn)}</div>` : ''}
             ${d.exampleEn ? `
               <div class="text-[11px] text-indigo-900 font-medium pt-1 border-t border-slate-100 flex items-start justify-between gap-1">
                 <span>💬 ${escapeHtml(d.exampleEn)}</span>
-                <button type="button" onclick="event.stopPropagation(); speakText(decodeURIComponent('${safeExampleEn}'))" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
+                <button type="button" onclick="event.stopPropagation(); speakText('${safeExampleEn}')" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
               </div>` : ''}
             ${d.exampleJa ? `<div class="text-[10px] text-slate-500">${escapeHtml(d.exampleJa)}</div>` : ''}
           `;
@@ -1404,7 +1410,7 @@
         });
       }
     
-      // --- 派生語の表示処理 ---
+      // 派生語の表示処理（安全なURLエンコード適用）
       if (item.derived && item.derived.length > 0) {
         const derivedBlock = document.createElement('div');
         derivedBlock.className = 'bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1 mt-2';
@@ -1415,7 +1421,7 @@
           html += `
             <div class="text-[11px] text-amber-900 flex items-center justify-between">
               <span><strong>${escapeHtml(dr.derivedWord)}</strong>: ${escapeHtml(dr.meaning)}</span>
-              <button type="button" onclick="event.stopPropagation(); speakText(decodeURIComponent('${safeDerivedWord}'))" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
+              <button type="button" onclick="event.stopPropagation(); speakText('${safeDerivedWord}')" class="text-xs shrink-0 hover:scale-110 transition">🔊</button>
             </div>`;
         });
         derivedBlock.innerHTML = html;
