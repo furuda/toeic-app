@@ -87,6 +87,23 @@
 
     <!-- メインTOP画面 -->
     <div id="setup-card" class="space-y-5 hidden">
+      <!-- 今日の学習タスク表示カード（追加部分） -->
+      <div id="today-task-card" class="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-2xl shadow-md p-4 space-y-3 hidden">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">📅</span>
+            <h2 class="text-sm font-bold tracking-wide">本日の学習予定（進捗シート）</h2>
+          </div>
+          <span id="today-date-badge" class="text-[11px] bg-white/20 px-2 py-0.5 rounded-full font-mono">2026-07-31</span>
+        </div>
+        <div class="bg-white/10 rounded-xl p-3 border border-white/20 space-y-1.5">
+          <div class="text-xs opacity-90">予定ステージ:</div>
+          <div id="today-target-stage" class="text-base font-extrabold tracking-wide text-amber-300">Stage 01, Stage 02</div>
+        </div>
+        <button onclick="startTodayTaskQuiz()" class="w-full bg-white text-indigo-700 hover:bg-amber-300 font-bold py-2.5 rounded-xl shadow transition text-xs flex items-center justify-center gap-1">
+          🎯 本日の予定ステージで今すぐ開始
+        </button>
+      </div>
       
       <!-- 学習進捗ダッシュボード -->
       <div id="dashboard-container" class="bg-white rounded-2xl shadow-md p-5 space-y-4 border border-slate-200">
@@ -517,7 +534,7 @@
 
   <script>
     // 🔗 ここにご自身の GAS ウェブアプリ URL を設定してください
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxest2GBukng_veZ8gNRBybLOKzcaMKk2s5iloTsnRtdjzAJjtp7blLm34ymycL96_SLA/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyTGEfJF2djIZgOm8xv4LrBiO61hQbV15HZWiewofYonofINDpKVIjZVwBS32N7c4Lryg/exec";
 
     const INTERVALS = [1, 3, 7, 14, 30, 60, 90];
     const STORAGE_KEY = 'vocab_app_paused_session_v2';
@@ -526,6 +543,7 @@
     // アプリ状態
     const App = {
       allWords: [],
+      todayProgress: null, // 👈 追加
       queue: [],
       index: 0,
       roundBoundaryIndex: 0,
@@ -1039,10 +1057,16 @@
     }
 
     function onDataLoaded(data) {
-      App.allWords = data;
-
+      // GAS側で { words: [...], todayProgress: {...} } を返すように対応
+      if (data.words) {
+        App.allWords = data.words;
+        App.todayProgress = data.todayProgress;
+      } else {
+        App.allWords = data; // 互換用
+      }
+    
       const meaningsSet = new Set();
-      data.forEach(item => {
+      App.allWords.forEach(item => {
         if (item.details && Array.isArray(item.details)) {
           item.details.forEach(d => {
             if (d.meaningEn && String(d.meaningEn).trim().length > 0) {
@@ -1052,15 +1076,63 @@
         }
       });
       App.allMeaningEnList = Array.from(meaningsSet);
-
+    
       renderDashboard();
       renderWeaknessChart();
+      renderTodayTask(); // 👈 追加：今日のタスクカードの表示更新
       updateFilteredWordCount();
-
+    
       document.getElementById('loading').classList.add('hidden');
       document.getElementById('setup-card').classList.remove('hidden');
-
+    
       checkResumeData();
+    }
+
+    /**
+     * 今日のタスクカードを描画
+     */
+    function renderTodayTask() {
+      const card = document.getElementById('today-task-card');
+      if (!App.todayProgress || !App.todayProgress.targetStage) {
+        card.classList.add('hidden');
+        return;
+      }
+    
+      document.getElementById('today-date-badge').textContent = App.todayProgress.date;
+      document.getElementById('today-target-stage').textContent = App.todayProgress.targetStage;
+      card.classList.remove('hidden');
+    }
+
+    /**
+     * 「本日の予定ステージで今すぐ開始」ボタンの処理
+     */
+    function startTodayTaskQuiz() {
+      if (!App.todayProgress || !App.todayProgress.targetStage) return;
+    
+      const targetStr = App.todayProgress.targetStage;
+      
+      // カンマ区切り（例: "Stage 01, Stage 02"）にも対応
+      const targetStages = targetStr.split(/[,、\s]+/).map(s => s.trim()).filter(Boolean);
+    
+      // 全解除してから該当ステージだけ選択
+      selectAllStages(false);
+      
+      targetStages.forEach(stageName => {
+        // Stage表記のゆらぎ吸収（"Stage 1" ➔ "Stage 01" 等）
+        let formattedName = stageName;
+        const match = stageName.match(/\d+/);
+        if (match) {
+          formattedName = `Stage ${String(match[0]).padStart(2, '0')}`;
+        }
+    
+        const btn = document.querySelector(`.stage-chip[data-stage="${formattedName}"]`);
+        if (btn) {
+          toggleStageChip(formattedName, btn);
+        }
+      });
+    
+      updateFilteredWordCount();
+      startQuiz();
     }
 
     function renderDashboard() {
