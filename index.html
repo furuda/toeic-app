@@ -1779,6 +1779,9 @@
       }
     }
 
+    /**
+     * 小テストの選択肢をクリックした際の処理（結果連動・修正版）
+     */
     function selectTestChoice(selectedBtn, isCorrect, correctMeaningText) {
       if (App.testTimer) clearInterval(App.testTimer);
     
@@ -1812,6 +1815,33 @@
             btn.classList.remove('border-slate-200');
             btn.classList.add('border-emerald-500', 'bg-emerald-50');
           }
+        });
+      }
+
+      // ✨【重要修正】小テストの結果を App.results 側にも連動・上書き反映する
+      const today = getTodayDateString();
+      const existingResult = App.results.find(r => r.id === item.id);
+
+      if (existingResult) {
+        existingResult.isCorrect = finalStatusIsCorrect;
+        existingResult.status = finalStatusIsCorrect ? 1 : 2; // 1:学習済み, 2:要復習
+        if (!finalStatusIsCorrect) {
+          existingResult.mistakes = (existingResult.mistakes || 0) + 1;
+          existingResult.nextReviewDate = today; // 不正解なら復習日を今日に戻す
+        }
+      } else {
+        // 万が一 App.results に無い場合の安全追加
+        App.results.push({
+          id: item.id,
+          word: item.word,
+          stage: item.stage,
+          previousStatus: item.status,
+          status: finalStatusIsCorrect ? 1 : 2,
+          mistakes: finalStatusIsCorrect ? (item.mistakes || 0) : ((item.mistakes || 0) + 1),
+          reviewCount: item.reviewCount || 0,
+          nextReviewDate: today,
+          lastReviewDate: today,
+          isCorrect: finalStatusIsCorrect
         });
       }
     
