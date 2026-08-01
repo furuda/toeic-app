@@ -543,7 +543,19 @@
         <div>要復習: <span id="result-wrong" class="font-bold text-rose-600">0</span></div>
       </div>
 
+      <!-- 修正①：結果サマリー -->
       <p id="result-summary" class="text-slate-600 text-xs leading-relaxed"></p>
+      
+      <!-- ✨ 追加：学習単語の一覧表示アコーディオン/リスト -->
+      <div class="text-left space-y-2 border-t pt-3">
+        <h3 class="text-xs font-bold text-slate-700 flex items-center justify-between">
+          <span>📋 今回の学習単語一覧</span>
+          <span id="result-word-count-badge" class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">全 0 件</span>
+        </h3>
+        <div id="result-word-list" class="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-xs">
+          <!-- JSでここに単語リストが挿入されます -->
+        </div>
+      </div>
       
       <div class="space-y-3 pt-2">
         <button id="save-btn" onclick="saveAndReset()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md transition active:scale-95">
@@ -1857,29 +1869,98 @@
       document.getElementById('pause-btn').classList.add('hidden');
       document.getElementById('progress-indicator').classList.add('hidden');
     
-      const totalStudied = App.roundBoundaryIndex;
       const learnedCount = App.stats.correct || 0; 
-      const needReviewCount = Math.max(0, totalStudied - learnedCount);
+      // ✍️ 修正：実際の「要復習」回数を App.stats.wrong から正確に取得
+      const wrongCount = App.stats.wrong || 0;
+      const totalAnswersCount = learnedCount + wrongCount;
     
       const totalTest = App.stats.testCorrect + App.stats.testWrong;
       const testRate = totalTest > 0 ? Math.round((App.stats.testCorrect / totalTest) * 100) : '-';
-    
-      const quizRate = totalStudied > 0 ? Math.round((learnedCount / totalStudied) * 100) : 0;
+      const quizRate = totalAnswersCount > 0 ? Math.round((learnedCount / totalAnswersCount) * 100) : 0;
     
       document.getElementById('result-rate').textContent = `${quizRate}%`;
       document.getElementById('test-result-rate').textContent = totalTest > 0 ? `${testRate}%` : '-';
     
+      // ✍️ 正しいカウント数を反映（覚えた: 20 / 要復習: 8）
       document.getElementById('result-correct').textContent = learnedCount;
-      document.getElementById('result-wrong').textContent = needReviewCount;
+      document.getElementById('result-wrong').textContent = wrongCount;
     
-      let summaryText = `今回のセッションで ${totalStudied} 単語を学習しました。`;
+      let summaryText = `今回のセッションで合計 ${totalAnswersCount} 回の解答を行いました。`;
       if (totalTest > 0) {
         summaryText += ` 確認小テストの正解率は ${testRate}% でした！`;
       }
       document.getElementById('result-summary').textContent = summaryText;
+
+      // ✨ 追加：今回学習した単語の一覧表示生成処理
+      renderResultWordList();
     
       document.getElementById('result-card').classList.remove('hidden');
       clearResumeData();
+    }
+
+    /**
+     * ✨ 結果画面に学習した全単語の一覧を表示する関数
+     */
+    function renderResultWordList() {
+      const listEl = document.getElementById('result-word-list');
+      const badgeEl = document.getElementById('result-word-count-badge');
+      if (!listEl) return;
+
+      listEl.innerHTML = '';
+
+      // IDごとの最新の学習結果をまとめマップ化
+      const resultMap = new Map();
+      App.results.forEach(r => {
+        resultMap.set(r.id, {
+          word: r.word,
+          stage: r.stage,
+          isCorrect: r.isCorrect,
+          mistakes: r.mistakes
+        });
+      });
+
+      // 小テストの結果も紐づけ
+      const testMap = new Map();
+      App.testResults.forEach(tr => {
+        testMap.set(tr.id, tr.isCorrect);
+      });
+
+      if (badgeEl) badgeEl.textContent = `全 ${resultMap.size} 単語`;
+
+      if (resultMap.size === 0) {
+        listEl.innerHTML = '<div class="text-center text-slate-400 py-2">学習データがありません</div>';
+        return;
+      }
+
+      resultMap.forEach((info, id) => {
+        const hasTest = testMap.has(id);
+        const testPassed = testMap.get(id);
+
+        const cardBadge = info.isCorrect
+          ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">カード: ⭕️覚えた</span>'
+          : '<span class="text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-bold">カード: ❌要復習</span>';
+
+        let testBadge = '';
+        if (hasTest) {
+          testBadge = testPassed
+            ? '<span class="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-bold">テスト: ⭕️正解</span>'
+            : '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">テスト: ❌不正解</span>';
+        }
+
+        const item = document.createElement('div');
+        item.className = 'p-2 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs';
+        item.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-slate-800">${escapeHtml(info.word)}</span>
+            <span class="text-[10px] text-slate-400">(${info.stage})</span>
+          </div>
+          <div class="flex items-center space-x-1">
+            ${cardBadge}
+            ${testBadge}
+          </div>
+        `;
+        listEl.appendChild(item);
+      });
     }
 
     async function saveAndReset() {
