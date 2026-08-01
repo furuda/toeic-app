@@ -1864,40 +1864,37 @@
     }
 
     function showResults() {
+      // タイマーの停止
+      if (App.testTimer) clearInterval(App.testTimer);
+
+      // 他のコンテナを非表示
       document.getElementById('test-container').classList.add('hidden');
       document.getElementById('quiz-container').classList.add('hidden');
       document.getElementById('pause-btn').classList.add('hidden');
       document.getElementById('progress-indicator').classList.add('hidden');
 
-      // ✍️ 修正：履歴（App.results）から単語IDごとの最終結果を集計する
+      // 結果の集計処理（単語の種類数ベース）
       const finalResultMap = new Map();
       App.results.forEach(r => {
-        // 同じ単語が複数回出題された場合、最後の結果で上書き（または1度でも間違えたか）
         finalResultMap.set(r.id, r.isCorrect);
       });
 
-      let learnedCount = 0; // 覚えた単語の「種類数」
-      let wrongCount = 0;   // 要復習の単語の「種類数」
+      let learnedCount = 0;
+      let wrongCount = 0;
 
       finalResultMap.forEach(isCorrect => {
-        if (isCorrect) {
-          learnedCount++;
-        } else {
-          wrongCount++;
-        }
+        if (isCorrect) learnedCount++;
+        else wrongCount++;
       });
 
-      const totalWords = finalResultMap.size; // 今回扱ったユニーク単語数（20 + 6 = 26個）
-
+      const totalWords = finalResultMap.size;
       const totalTest = App.stats.testCorrect + App.stats.testWrong;
       const testRate = totalTest > 0 ? Math.round((App.stats.testCorrect / totalTest) * 100) : '-';
       const quizRate = totalWords > 0 ? Math.round((learnedCount / totalWords) * 100) : 0;
 
-      // 正しい単語暗記率（20 / 26 ➔ 約77%）
       document.getElementById('result-rate').textContent = `${quizRate}%`;
       document.getElementById('test-result-rate').textContent = totalTest > 0 ? `${testRate}%` : '-';
 
-      // 正しい種類数を表示（覚えた: 20 / 要復習: 6）
       document.getElementById('result-correct').textContent = learnedCount;
       document.getElementById('result-wrong').textContent = wrongCount;
 
@@ -1907,9 +1904,17 @@
       }
       document.getElementById('result-summary').textContent = summaryText;
 
-      // 結果一覧の表示呼び出し
+      // 一覧の描画
       renderResultWordList();
 
+      // ✨ 保存ボタンの状態を初期状態に戻す（disabled解除）
+      const saveBtn = document.getElementById('save-btn');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 データを保存してTOPへ戻る';
+      }
+
+      // 結果カードを表示
       document.getElementById('result-card').classList.remove('hidden');
       clearResumeData();
     }
