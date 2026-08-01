@@ -216,12 +216,14 @@
             </select>
           </div>
 
+          <!-- Index.html 内の mode-select 部分 -->
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">学習モード</label>
             <select id="mode-select" onchange="toggleWeakCount(); updateFilteredWordCount();" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none">
               <option value="review">📅 今日要復習の単語</option>
               <option value="unlearned">🆕 未学習の単語のみ</option>
               <option value="weak">❌ 間違いの多い単語</option>
+              <option value="id_order">🔢 ID順番通り（登録順）</option> <!-- 👈 追加！ -->
               <option value="all">🎲 指定条件の全単語（ランダム）</option>
             </select>
           </div>
@@ -1402,6 +1404,9 @@
       startQuiz();
     }
 
+    /**
+     * クイズ開始処理（ID順対応版）
+     */
     function startQuiz() {
       const filtered = filterWords();
       if (filtered.length === 0) {
@@ -1409,7 +1414,24 @@
         return;
       }
 
-      App.queue = [...filtered].sort(() => Math.random() - 0.5);
+      const mode = document.getElementById('mode-select').value;
+
+      // 選択されたモードに応じて並び替え
+      if (mode === 'id_order') {
+        // ID順（数値として比較。数値に変換できない場合は文字列比較）でソート
+        App.queue = [...filtered].sort((a, b) => {
+          const idA = parseFloat(a.id) || a.id;
+          const idB = parseFloat(b.id) || b.id;
+          if (typeof idA === 'number' && typeof idB === 'number') {
+            return idA - idB;
+          }
+          return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+        });
+      } else {
+        // それ以外のモードは従来どおりランダムシャッフル
+        App.queue = [...filtered].sort(() => Math.random() - 0.5);
+      }
+
       App.index = 0;
       App.roundBoundaryIndex = App.queue.length;
       App.results = [];
