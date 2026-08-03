@@ -1586,9 +1586,6 @@
       }
     }
 
-    /**
-     * 解答処理（周回時の残単語再シャッフル対応版）
-     */
     function handleAnswer(isCorrect, extra = {}) {
       const card = document.getElementById('flashcard');
       const item = App.queue[App.index];
@@ -1604,7 +1601,6 @@
         nextDate.setDate(nextDate.getDate() + intervalDays);
         const nextDateStr = nextDate.toISOString().split('T')[0];
     
-        // 既存の結果があれば上書き、なければ追加
         const existingIdx = App.results.findIndex(r => r.id === item.id);
         const resultData = {
           id: item.id,
@@ -1659,19 +1655,24 @@
         }
       }
     
+      // ★【追加】回答直後に「覚えた数」とヘッダー表示を即時計算・更新
+      const total = App.roundBoundaryIndex || App.queue.length;
+      const learnedCount = App.results.filter(r => r.isCorrect).length;
+      const indicatorEl = document.getElementById('progress-indicator');
+      if (indicatorEl) {
+        indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
+      }
+    
       setTimeout(() => {
         App.index++;
     
-        // 1周分のカードが終わったかの判定
         if (App.index >= App.queue.length) {
-          // まだ「正解（isCorrect = true）」になっていない単語を取得
           const learnedIds = new Set(
             App.results.filter(r => r.isCorrect).map(r => r.id)
           );
           const remainingWords = App.queue.filter(w => !learnedIds.has(w.id));
     
           if (remainingWords.length > 0) {
-            // 残った要復習単語を再シャッフルして次の周へ
             const mode = document.getElementById('mode-select').value;
             if (mode !== 'id_order') {
               remainingWords.sort(() => Math.random() - 0.5);
@@ -1681,7 +1682,7 @@
             App.index = 0;
             showCurrentCard();
           } else {
-            // 全て覚え終わったら小テストへ移行
+            // すべて覚えきったら小テストへ
             startTestSession();
           }
         } else {
@@ -1691,10 +1692,9 @@
     }
 
     function startTestSession() {
-      // 1. カード学習画面を非表示にする
       document.getElementById('quiz-container').classList.add('hidden');
       
-      // 2. ✨【追加】小テスト移行時にヘッダーの「覚えた数 / 全体数」を最終結果に更新する
+      // ★【確定処理】カード学習完了時の最終カウントでヘッダーを確実に「5 (覚えた数) / 5」に更新
       const total = App.roundBoundaryIndex || (App.results ? App.results.length : 0);
       const learnedCount = App.results.filter(r => r.isCorrect).length;
       const indicatorEl = document.getElementById('progress-indicator');
@@ -1702,7 +1702,6 @@
         indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
       }
     
-      // 3. 小テスト対象の重複排除処理
       const uniqueTestQueue = [];
       const seenIds = new Set();
       
@@ -1715,7 +1714,6 @@
     
       App.testQueue = uniqueTestQueue;
     
-      // 小テスト対象が0件の場合はそのまま結果画面へ
       if (App.testQueue.length === 0) {
         showResults();
         return;
@@ -1768,9 +1766,11 @@
       const item = App.testQueue[App.testIndex];
       const total = App.testQueue.length;
     
+      // ★ 小テストエリア内の進捗表示（1 / 5, 2 / 5 ...）
       document.getElementById('test-progress').textContent = `${App.testIndex + 1} / ${total}`;
       document.getElementById('test-word-label').textContent = item.word;
     
+      // --- 以下は元の処理のまま ---
       let detail = {};
       if (item.details && item.details.length > 0) {
         const randomIndex = Math.floor(Math.random() * item.details.length);
@@ -1779,7 +1779,6 @@
       }
       
       const exampleEl = document.getElementById('test-example');
-      // textContent 経由ではなく安全に生成したHTMLを挿入
       exampleEl.innerHTML = highlightWordInExample(detail.exampleEn, item.word);
     
       document.getElementById('test-meaning-ja').textContent = detail.meaningJa || 'ー';
