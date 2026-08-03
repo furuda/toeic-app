@@ -1811,9 +1811,6 @@
       }
     }
 
-    /**
-     * 小テストの選択肢をクリックした際の処理（結果連動・修正版）
-     */
     function selectTestChoice(selectedBtn, isCorrect, correctMeaningText) {
       if (App.testTimer) clearInterval(App.testTimer);
     
@@ -1850,7 +1847,7 @@
         });
       }
 
-      // 小テストの結果を App.results 側にも連動・上書き反映する
+      // 💡 小テストの結果を App.results に【確定ステータス】として上書き反映
       const today = getTodayDateString();
       const existingResult = App.results.find(r => r.id === item.id);
 
@@ -1859,11 +1856,9 @@
         existingResult.status = finalStatusIsCorrect ? 1 : 2; // 1:学習済み, 2:要復習
         if (!finalStatusIsCorrect) {
           existingResult.mistakes = (existingResult.mistakes || 0) + 1;
-          existingResult.nextReviewDate = today; // 不正解なら復習日を今日に戻す
+          existingResult.nextReviewDate = today;
         }
-        // 既存の pronunciationSkipped や pronunciationFailCount は保持されます
       } else {
-        // 万が一 App.results に無い場合の安全追加
         App.results.push({
           id: item.id,
           word: item.word,
@@ -1874,9 +1869,7 @@
           reviewCount: item.reviewCount || 0,
           nextReviewDate: today,
           lastReviewDate: today,
-          isCorrect: finalStatusIsCorrect,
-          pronunciationSkipped: false,
-          pronunciationFailCount: 0
+          isCorrect: finalStatusIsCorrect
         });
       }
     
@@ -1929,16 +1922,14 @@
     }
 
     function showResults() {
-      // タイマーの停止
       if (App.testTimer) clearInterval(App.testTimer);
 
-      // 他のコンテナを非表示
       document.getElementById('test-container').classList.add('hidden');
       document.getElementById('quiz-container').classList.add('hidden');
       document.getElementById('pause-btn').classList.add('hidden');
       document.getElementById('progress-indicator').classList.add('hidden');
 
-      // 結果の集計処理（単語の種類数ベース）
+      // 💡 各単語の最終結果を集計（小テストでの判定結果を最優先）
       const finalResultMap = new Map();
       App.results.forEach(r => {
         finalResultMap.set(r.id, r.isCorrect);
@@ -1969,24 +1960,18 @@
       }
       document.getElementById('result-summary').textContent = summaryText;
 
-      // 一覧の描画
       renderResultWordList();
 
-      // ✨ 保存ボタンの状態を初期状態に戻す（disabled解除）
       const saveBtn = document.getElementById('save-btn');
       if (saveBtn) {
         saveBtn.disabled = false;
         saveBtn.textContent = '💾 データを保存してTOPへ戻る';
       }
 
-      // 結果カードを表示
       document.getElementById('result-card').classList.remove('hidden');
       clearResumeData();
     }
 
-    /**
-     * ✨ 結果画面に学習した全単語の一覧を表示する関数
-     */
     function renderResultWordList() {
       const listEl = document.getElementById('result-word-list');
       const badgeEl = document.getElementById('result-word-count-badge');
@@ -1994,7 +1979,13 @@
 
       listEl.innerHTML = '';
 
-      // IDごとの最新の学習結果をまとめマップ化
+      // 小テスト結果のマップ
+      const testMap = new Map();
+      App.testResults.forEach(tr => {
+        testMap.set(tr.id, tr.isCorrect);
+      });
+
+      // 単語ごとの最新結果マップ
       const resultMap = new Map();
       App.results.forEach(r => {
         resultMap.set(r.id, {
@@ -2003,12 +1994,6 @@
           isCorrect: r.isCorrect,
           mistakes: r.mistakes
         });
-      });
-
-      // 小テストの結果も紐づけ
-      const testMap = new Map();
-      App.testResults.forEach(tr => {
-        testMap.set(tr.id, tr.isCorrect);
       });
 
       if (badgeEl) badgeEl.textContent = `全 ${resultMap.size} 単語`;
@@ -2022,7 +2007,10 @@
         const hasTest = testMap.has(id);
         const testPassed = testMap.get(id);
 
-        const cardBadge = info.isCorrect
+        // 小テストがある場合は小テストの正否、ない場合はカードの正否を表示
+        const cardPassed = hasTest ? testPassed : info.isCorrect;
+
+        const cardBadge = cardPassed
           ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">カード: ⭕️覚えた</span>'
           : '<span class="text-[10px] bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded font-bold">カード: ❌要復習</span>';
 
