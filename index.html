@@ -1471,7 +1471,11 @@
     
       const item = App.queue[App.index];
       const total = App.roundBoundaryIndex;
-      const learnedCount = App.stats.correct || 0;
+    
+      // 💡 【修正】正解（isCorrect: true）になったユニークな単語の数を正確にカウント
+      const learnedCount = new Set(
+        App.results.filter(r => r.isCorrect).map(r => r.id)
+      ).size;
     
       const indicatorEl = document.getElementById('progress-indicator');
       indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
@@ -1580,9 +1584,6 @@
       }
     }
 
-    /**
-     * 解答処理（周回時の残単語再シャッフル対応版）
-     */
     function handleAnswer(isCorrect, extra = {}) {
       const card = document.getElementById('flashcard');
       const item = App.queue[App.index];
@@ -1603,7 +1604,7 @@
           id: item.id,
           word: item.word,
           stage: item.stage,
-          previousStatus: item.status, // 👈 ここを確認・保持
+          previousStatus: item.status,
           status: 1,
           mistakes: item.mistakes || 0,
           reviewCount: nextRevCount,
@@ -1613,7 +1614,6 @@
           ...extra
         });
     
-        // 覚えた単語も確認小テストの対象に追加
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
@@ -1625,7 +1625,7 @@
           id: item.id,
           word: item.word,
           stage: item.stage,
-          previousStatus: item.status, // 👈 ここを確認・保持
+          previousStatus: item.status,
           status: 2,
           mistakes: newMistakes,
           reviewCount: item.reviewCount || 0,
@@ -1635,44 +1635,45 @@
           ...extra
         });
     
-        // 要復習の単語も小テスト対象へ追加
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
       }
     
+      // 💡 【修正】カードが消えるアニメーション中にプログレス表示をリアルタイム更新する
+      const currentLearned = new Set(
+        App.results.filter(r => r.isCorrect).map(r => r.id)
+      ).size;
+      const total = App.roundBoundaryIndex;
+      document.getElementById('progress-indicator').textContent = `${currentLearned} (覚えた数) / ${total}`;
+      document.getElementById('progress-bar').style.width = `${Math.min(100, Math.round((currentLearned / total) * 100))}%`;
+    
       setTimeout(() => {
         App.index++;
     
-        // 一巡（一週）の境界に達したかチェック
         if (App.index >= App.roundBoundaryIndex) {
-          // 1. 今回の周でまだ「覚えた（isCorrect = true）」になっていない単語のIDを特定
           const learnedIds = new Set(
             App.results.filter(r => r.isCorrect).map(r => r.id)
           );
     
-          // 2. まだ覚えていない単語だけをキューから抽出
           const remainingWords = App.queue.filter(w => !learnedIds.has(w.id));
     
           if (remainingWords.length > 0) {
-            // モードが ID順 でなければ、残った単語（例: 35個）を再度ランダムシャッフル！
             const mode = document.getElementById('mode-select').value;
             if (mode !== 'id_order') {
               remainingWords.sort(() => Math.random() - 0.5);
             }
     
-            // 新しい二巡目（三巡目...）のキューを構築
             App.queue = remainingWords;
             App.index = 0;
             App.roundBoundaryIndex = remainingWords.length;
     
             showCurrentCard();
           } else {
-            // 全単語を覚えきった場合は小テスト（テストセッション）へ進む
+            // すべて覚えたら確認小テストへ
             startTestSession();
           }
         } else {
-          // 一巡の途中であれば次のカードを表示
           showCurrentCard();
         }
       }, 250);
