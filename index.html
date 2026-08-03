@@ -1643,6 +1643,26 @@
 
       setTimeout(() => {
         App.index++;
+        
+        // 【追加】現在の周（ラウンド）の単語をすべて解き終わったときの処理
+        if (App.index >= App.roundBoundaryIndex) {
+          // 未消化の単語（残りの要復習単語）を取得
+          const remainingWords = App.queue.slice(App.index);
+          
+          if (remainingWords.length > 0) {
+            // ランダムモード（id_order 以外）の場合、次周の残単語をシャッフルする
+            const mode = document.getElementById('mode-select').value;
+            if (mode !== 'id_order') {
+              remainingWords.sort(() => Math.random() - 0.5);
+            }
+            
+            // 解答済みの履歴 + シャッフルした残単語 でキューを再構築
+            App.queue = App.queue.slice(0, App.index).concat(remainingWords);
+            // 新しい周の境界（全単語数）を更新
+            App.roundBoundaryIndex = App.queue.length;
+          }
+        }
+
         if (App.index < App.queue.length) {
           showCurrentCard();
         } else {
