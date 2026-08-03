@@ -1421,7 +1421,7 @@
     }
 
     /**
-     * クイズ開始処理（ID順対応版）
+     * クイズ開始処理（周回管理・再シャッフル対応版）
      */
     function startQuiz() {
       const filtered = filterWords();
@@ -1429,12 +1429,11 @@
         alert('指定された条件に一致する単語がありません。条件を変更してください。');
         return;
       }
-
+    
       const mode = document.getElementById('mode-select').value;
-
+    
       // 選択されたモードに応じて並び替え
       if (mode === 'id_order') {
-        // ID順（数値として比較。数値に変換できない場合は文字列比較）でソート
         App.queue = [...filtered].sort((a, b) => {
           const idA = parseFloat(a.id) || a.id;
           const idB = parseFloat(b.id) || b.id;
@@ -1444,24 +1443,24 @@
           return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
         });
       } else {
-        // それ以外のモードは従来どおりランダムシャッフル
+        // ランダムシャッフル
         App.queue = [...filtered].sort(() => Math.random() - 0.5);
       }
-
+    
       App.index = 0;
-      App.roundBoundaryIndex = App.queue.length;
+      App.roundBoundaryIndex = App.queue.length; // 一巡目の境界位置
       App.results = [];
       App.testQueue = [];
       App.testIndex = 0;
       App.testResults = [];
       App.stats = { correct: 0, wrong: 0, testCorrect: 0, testWrong: 0 };
       App.isTesting = false;
-
+    
       document.getElementById('setup-card').classList.add('hidden');
       document.getElementById('pause-btn').classList.remove('hidden');
       document.getElementById('progress-indicator').classList.remove('hidden');
       document.getElementById('quiz-container').classList.remove('hidden');
-
+    
       showCurrentCard();
     }
 
@@ -1581,15 +1580,17 @@
       }
     }
 
-    // ===== 修正① ＆ 修正②：スキップ情報保持 + 要復習単語の小テスト追加 =====
+    /**
+     * 解答処理（周回時の残単語再シャッフル対応版）
+     */
     function handleAnswer(isCorrect, extra = {}) {
       const card = document.getElementById('flashcard');
       const item = App.queue[App.index];
-
+    
       card.classList.add(isCorrect ? 'swipe-right' : 'swipe-left');
-
+    
       const today = getTodayDateString();
-
+    
       if (isCorrect) {
         App.stats.correct++;
         const nextRevCount = (item.reviewCount || 0) + 1;
@@ -1597,7 +1598,7 @@
         const nextDate = new Date();
         nextDate.setDate(nextDate.getDate() + intervalDays);
         const nextDateStr = nextDate.toISOString().split('T')[0];
-
+    
         App.results.push({
           id: item.id,
           word: item.word,
@@ -1609,16 +1610,17 @@
           nextReviewDate: nextDateStr,
           lastReviewDate: today,
           isCorrect: true,
-          ...extra   // ← スキップ情報を展開
+          ...extra
         });
-
+    
+        // 覚えた単語も確認小テストの対象に追加
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
       } else {
         App.stats.wrong++;
         const newMistakes = (item.mistakes || 0) + 1;
-
+    
         App.results.push({
           id: item.id,
           word: item.word,
@@ -1630,43 +1632,48 @@
           nextReviewDate: today,
           lastReviewDate: today,
           isCorrect: false,
-          ...extra   // ← スキップ情報を展開
+          ...extra
         });
-
-        App.queue.push(item);
-
-        // ===== 修正②：要復習の単語も小テストへ追加 =====
+    
+        // 要復習の単語も小テスト対象へ追加
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
       }
-
+    
       setTimeout(() => {
         App.index++;
-        
-        // 【追加】現在の周（ラウンド）の単語をすべて解き終わったときの処理
+    
+        // 一巡（一週）の境界に達したかチェック
         if (App.index >= App.roundBoundaryIndex) {
-          // 未消化の単語（残りの要復習単語）を取得
-          const remainingWords = App.queue.slice(App.index);
-          
+          // 1. 今回の周でまだ「覚えた（isCorrect = true）」になっていない単語のIDを特定
+          const learnedIds = new Set(
+            App.results.filter(r => r.isCorrect).map(r => r.id)
+          );
+    
+          // 2. まだ覚えていない単語だけをキューから抽出
+          const remainingWords = App.queue.filter(w => !learnedIds.has(w.id));
+    
           if (remainingWords.length > 0) {
-            // ランダムモード（id_order 以外）の場合、次周の残単語をシャッフルする
+            // モードが ID順 でなければ、残った単語（例: 35個）を再度ランダムシャッフル！
             const mode = document.getElementById('mode-select').value;
             if (mode !== 'id_order') {
               remainingWords.sort(() => Math.random() - 0.5);
             }
-            
-            // 解答済みの履歴 + シャッフルした残単語 でキューを再構築
-            App.queue = App.queue.slice(0, App.index).concat(remainingWords);
-            // 新しい周の境界（全単語数）を更新
-            App.roundBoundaryIndex = App.queue.length;
+    
+            // 新しい二巡目（三巡目...）のキューを構築
+            App.queue = remainingWords;
+            App.index = 0;
+            App.roundBoundaryIndex = remainingWords.length;
+    
+            showCurrentCard();
+          } else {
+            // 全単語を覚えきった場合は小テスト（テストセッション）へ進む
+            startTestSession();
           }
-        }
-
-        if (App.index < App.queue.length) {
-          showCurrentCard();
         } else {
-          startTestSession();
+          // 一巡の途中であれば次のカードを表示
+          showCurrentCard();
         }
       }, 250);
     }
