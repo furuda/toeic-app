@@ -1691,8 +1691,18 @@
     }
 
     function startTestSession() {
+      // 1. カード学習画面を非表示にする
       document.getElementById('quiz-container').classList.add('hidden');
       
+      // 2. ✨【追加】小テスト移行時にヘッダーの「覚えた数 / 全体数」を最終結果に更新する
+      const total = App.roundBoundaryIndex || (App.results ? App.results.length : 0);
+      const learnedCount = App.results.filter(r => r.isCorrect).length;
+      const indicatorEl = document.getElementById('progress-indicator');
+      if (indicatorEl) {
+        indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
+      }
+    
+      // 3. 小テスト対象の重複排除処理
       const uniqueTestQueue = [];
       const seenIds = new Set();
       
@@ -1705,6 +1715,7 @@
     
       App.testQueue = uniqueTestQueue;
     
+      // 小テスト対象が0件の場合はそのまま結果画面へ
       if (App.testQueue.length === 0) {
         showResults();
         return;
