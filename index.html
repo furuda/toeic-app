@@ -1470,15 +1470,21 @@
       card.classList.remove('rotate-y-180', 'swipe-left', 'swipe-right');
     
       const item = App.queue[App.index];
-      const total = App.roundBoundaryIndex;
-      const learnedCount = App.stats.correct || 0;
+      
+      // 基準となる全体の単語数（一巡目の総数）
+      const total = App.roundBoundaryIndex || App.queue.length;
+      // 今回のセッションで正解（覚えた）として判定済みのユニーク単語数
+      const learnedCount = App.results.filter(r => r.isCorrect).length;
     
+      // ヘッダーの進捗表示: 「4 (覚えた数) / 5」
       const indicatorEl = document.getElementById('progress-indicator');
       indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
     
+      // プログレスバーのパーセント計算
       const progressPercent = total > 0 ? Math.min(100, Math.round((learnedCount / total) * 100)) : 0;
       document.getElementById('progress-bar').style.width = `${progressPercent}%`;
     
+      // --- 以下のカード表示処理はそのまま ---
       document.getElementById('card-stage').textContent = item.stage;
       document.getElementById('card-importance').textContent = item.importance;
       document.getElementById('card-word').textContent = item.word;
@@ -1588,7 +1594,6 @@
       const item = App.queue[App.index];
     
       card.classList.add(isCorrect ? 'swipe-right' : 'swipe-left');
-    
       const today = getTodayDateString();
     
       if (isCorrect) {
@@ -1599,7 +1604,9 @@
         nextDate.setDate(nextDate.getDate() + intervalDays);
         const nextDateStr = nextDate.toISOString().split('T')[0];
     
-        App.results.push({
+        // 既存の結果があれば上書き、なければ追加
+        const existingIdx = App.results.findIndex(r => r.id === item.id);
+        const resultData = {
           id: item.id,
           word: item.word,
           stage: item.stage,
@@ -1611,9 +1618,14 @@
           lastReviewDate: today,
           isCorrect: true,
           ...extra
-        });
+        };
     
-        // 覚えた単語も確認小テストの対象に追加
+        if (existingIdx >= 0) {
+          App.results[existingIdx] = resultData;
+        } else {
+          App.results.push(resultData);
+        }
+    
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
@@ -1621,7 +1633,8 @@
         App.stats.wrong++;
         const newMistakes = (item.mistakes || 0) + 1;
     
-        App.results.push({
+        const existingIdx = App.results.findIndex(r => r.id === item.id);
+        const resultData = {
           id: item.id,
           word: item.word,
           stage: item.stage,
@@ -1633,9 +1646,14 @@
           lastReviewDate: today,
           isCorrect: false,
           ...extra
-        });
+        };
     
-        // 要復習の単語も小テスト対象へ追加
+        if (existingIdx >= 0) {
+          App.results[existingIdx] = resultData;
+        } else {
+          App.results.push(resultData);
+        }
+    
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
@@ -1644,35 +1662,29 @@
       setTimeout(() => {
         App.index++;
     
-        // 一巡（一週）の境界に達したかチェック
-        if (App.index >= App.roundBoundaryIndex) {
-          // 1. 今回の周でまだ「覚えた（isCorrect = true）」になっていない単語のIDを特定
+        // 1周分のカードが終わったかの判定
+        if (App.index >= App.queue.length) {
+          // まだ「正解（isCorrect = true）」になっていない単語を取得
           const learnedIds = new Set(
             App.results.filter(r => r.isCorrect).map(r => r.id)
           );
-    
-          // 2. まだ覚えていない単語だけをキューから抽出
           const remainingWords = App.queue.filter(w => !learnedIds.has(w.id));
     
           if (remainingWords.length > 0) {
-            // モードが ID順 でなければ、残った単語（例: 35個）を再度ランダムシャッフル！
+            // 残った要復習単語を再シャッフルして次の周へ
             const mode = document.getElementById('mode-select').value;
             if (mode !== 'id_order') {
               remainingWords.sort(() => Math.random() - 0.5);
             }
     
-            // 新しい二巡目（三巡目...）のキューを構築
             App.queue = remainingWords;
             App.index = 0;
-            App.roundBoundaryIndex = remainingWords.length;
-    
             showCurrentCard();
           } else {
-            // 全単語を覚えきった場合は小テスト（テストセッション）へ進む
+            // 全て覚え終わったら小テストへ移行
             startTestSession();
           }
         } else {
-          // 一巡の途中であれば次のカードを表示
           showCurrentCard();
         }
       }, 250);
