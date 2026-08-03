@@ -588,6 +588,7 @@
       queue: [],
       index: 0,
       roundBoundaryIndex: 0,
+      totalSelectedCount: 0, // 👈 追加！(最初に選ばれた全単語数を固定で保持)
       isFlipped: false,
       results: [],
       testQueue: [],
@@ -1432,7 +1433,6 @@
     
       const mode = document.getElementById('mode-select').value;
     
-      // 選択されたモードに応じて並び替え
       if (mode === 'id_order') {
         App.queue = [...filtered].sort((a, b) => {
           const idA = parseFloat(a.id) || a.id;
@@ -1443,12 +1443,12 @@
           return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
         });
       } else {
-        // ランダムシャッフル
         App.queue = [...filtered].sort(() => Math.random() - 0.5);
       }
     
       App.index = 0;
-      App.roundBoundaryIndex = App.queue.length; // 一巡目の境界位置
+      App.roundBoundaryIndex = App.queue.length;
+      App.totalSelectedCount = App.queue.length; // 👈 追加！(最初の全単語数をセット)
       App.results = [];
       App.testQueue = [];
       App.testIndex = 0;
@@ -1463,26 +1463,25 @@
     
       showCurrentCard();
     }
-
     function showCurrentCard() {
       App.isFlipped = false;
       const card = document.getElementById('flashcard');
       card.classList.remove('rotate-y-180', 'swipe-left', 'swipe-right');
-    
+
       const item = App.queue[App.index];
-      const total = App.roundBoundaryIndex;
-    
-      // 💡 【修正】正解（isCorrect: true）になったユニークな単語の数を正確にカウント
+      
+      // 分母は最初の全単語数、分子は「覚えた（isCorrect: true）」のユニーク数
+      const total = App.totalSelectedCount || App.roundBoundaryIndex;
       const learnedCount = new Set(
         App.results.filter(r => r.isCorrect).map(r => r.id)
       ).size;
-    
+
       const indicatorEl = document.getElementById('progress-indicator');
       indicatorEl.textContent = `${learnedCount} (覚えた数) / ${total}`;
-    
+
       const progressPercent = total > 0 ? Math.min(100, Math.round((learnedCount / total) * 100)) : 0;
       document.getElementById('progress-bar').style.width = `${progressPercent}%`;
-    
+
       document.getElementById('card-stage').textContent = item.stage;
       document.getElementById('card-importance').textContent = item.importance;
       document.getElementById('card-word').textContent = item.word;
@@ -1587,11 +1586,11 @@
     function handleAnswer(isCorrect, extra = {}) {
       const card = document.getElementById('flashcard');
       const item = App.queue[App.index];
-    
+
       card.classList.add(isCorrect ? 'swipe-right' : 'swipe-left');
-    
+
       const today = getTodayDateString();
-    
+
       if (isCorrect) {
         App.stats.correct++;
         const nextRevCount = (item.reviewCount || 0) + 1;
@@ -1599,7 +1598,7 @@
         const nextDate = new Date();
         nextDate.setDate(nextDate.getDate() + intervalDays);
         const nextDateStr = nextDate.toISOString().split('T')[0];
-    
+
         App.results.push({
           id: item.id,
           word: item.word,
@@ -1613,14 +1612,14 @@
           isCorrect: true,
           ...extra
         });
-    
+
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
       } else {
         App.stats.wrong++;
         const newMistakes = (item.mistakes || 0) + 1;
-    
+
         App.results.push({
           id: item.id,
           word: item.word,
@@ -1634,43 +1633,44 @@
           isCorrect: false,
           ...extra
         });
-    
+
         if (!App.testQueue.some(x => x.id === item.id)) {
           App.testQueue.push(item);
         }
       }
-    
-      // 💡 【修正】カードが消えるアニメーション中にプログレス表示をリアルタイム更新する
+
+      // 💡 ボタンを押した直後に表示を更新（分母は全単語数）
       const currentLearned = new Set(
         App.results.filter(r => r.isCorrect).map(r => r.id)
       ).size;
-      const total = App.roundBoundaryIndex;
+      const total = App.totalSelectedCount || App.roundBoundaryIndex;
+      
       document.getElementById('progress-indicator').textContent = `${currentLearned} (覚えた数) / ${total}`;
       document.getElementById('progress-bar').style.width = `${Math.min(100, Math.round((currentLearned / total) * 100))}%`;
-    
+
       setTimeout(() => {
         App.index++;
-    
+
         if (App.index >= App.roundBoundaryIndex) {
           const learnedIds = new Set(
             App.results.filter(r => r.isCorrect).map(r => r.id)
           );
-    
+
           const remainingWords = App.queue.filter(w => !learnedIds.has(w.id));
-    
+
           if (remainingWords.length > 0) {
             const mode = document.getElementById('mode-select').value;
             if (mode !== 'id_order') {
               remainingWords.sort(() => Math.random() - 0.5);
             }
-    
+
             App.queue = remainingWords;
             App.index = 0;
             App.roundBoundaryIndex = remainingWords.length;
-    
+
             showCurrentCard();
           } else {
-            // すべて覚えたら確認小テストへ
+            // 5個全て覚えたらテスト画面へ
             startTestSession();
           }
         } else {
