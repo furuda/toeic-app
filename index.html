@@ -955,13 +955,15 @@
     function speakText(text) {
       if (!('speechSynthesis' in window) || !text) return;
       
-      // decodeURIComponentでURLエンコードを解除して元の英語テキストに戻す
       let rawText = text;
       try {
         rawText = decodeURIComponent(text);
       } catch(e) {}
     
-      window.speechSynthesis.cancel();
+      // 修正：すでに発話中や待機中の場合のみキャンセルを挟むようにし、無駄なラグを削減する
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
     
       const u = new SpeechSynthesisUtterance(rawText);
       u.lang = 'en-US';
