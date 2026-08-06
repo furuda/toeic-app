@@ -1742,6 +1742,7 @@
         stem = cleanWord.slice(0, -1);
       }
     
+      // 活用形も含めてマッチさせる正規表現（例: amplify -> amplified 等も対象）
       const regex = new RegExp(`\\b(${cleanWord}(?:s|ed|ing|es|d)?|${stem}(?:ing|ed|es|er|or)?)\\b`, 'gi');
     
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
