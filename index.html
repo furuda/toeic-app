@@ -1728,7 +1728,7 @@
       showCurrentTestQuestion();
     }
 
-    // 1. highlightWordInExample 関数（エスケープ順序とマークアップ処理の修正）
+    // 1. highlightWordInExample 関数（yで終わる単語の活用形や既存のルールを網羅した修正版）
     function highlightWordInExample(exampleText, wordToHighlight) {
       if (!exampleText) return 'No example available.';
       if (!wordToHighlight) return escapeHtml(exampleText);
@@ -1738,12 +1738,26 @@
       let cleanWord = wordToHighlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     
       let stem = cleanWord;
+      let yVariant = '';
+      
       if (cleanWord.endsWith('e')) {
         stem = cleanWord.slice(0, -1);
+      } else if (cleanWord.endsWith('y')) {
+        // amplify -> amplif + ied / ies / ier / iest などに対応
+        stem = cleanWord.slice(0, -1);
+        yVariant = `${stem}(?:ied|ies|ier|iest|ying)?`;
       }
     
-      // 活用形も含めてマッチさせる正規表現（例: amplify -> amplified 等も対象）
-      const regex = new RegExp(`\\b(${cleanWord}(?:s|ed|ing|es|d)?|${stem}(?:ing|ed|es|er|or)?)\\b`, 'gi');
+      // マッチさせるパターンを構築
+      const patterns = [
+        `${cleanWord}(?:s|ed|ing|es|d)?`,
+        `${stem}(?:ing|ed|es|er|or)?`
+      ];
+      if (yVariant) {
+        patterns.push(yVariant);
+      }
+    
+      const regex = new RegExp(`\\b(${patterns.join('|')})\\b`, 'gi');
     
       return escapedEx.replace(regex, '<strong class="font-extrabold text-indigo-700 underline decoration-indigo-400 decoration-2 font-mono">$1</strong>');
     }
